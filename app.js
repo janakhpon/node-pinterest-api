@@ -1,7 +1,8 @@
 'use strict';
 
-var fs = require('fs'),
-	request = require('request');
+var fs		= require('fs'),
+	request = require('request'),
+	async	= require('async');
 
 /*
  * Constructor that will set the username
@@ -10,7 +11,7 @@ var fs = require('fs'),
  */
 
 function pinterestAPI(username) {
-	fs.exists('./cache', function(exists) {
+	fs.exists('./cache', function (exists) {
 		if (!exists) {
 			fs.mkdir('./cache');
 		}
@@ -32,15 +33,15 @@ function pinterestAPI(username) {
 	function getCache(key, callback) {
 		key = key.replace(/\//g, '-');
 		var cacheFile = './' + cachePrefix + key + '.cache';
-		fs.exists(cacheFile, function(exists) {
+		fs.exists(cacheFile, function (exists) {
 			if (exists) {
-				fs.stat(cacheFile, function(err, stats) {
+				fs.stat(cacheFile, function (err, stats) {
 					if (err) {
 						throw err;
 					}
 					if (stats.mtime.valueOf() > (new Date().valueOf() - 60 * 60 * 1000)) {
 						// The cache is less than 60 minutes old so return the contents
-						fs.readFile(cacheFile, function(err, data) {
+						fs.readFile(cacheFile, function (err, data) {
 							if (err) {
 								console.error('Error reading the cache file at ' + cacheFile);
 								throw err;
@@ -72,7 +73,7 @@ function pinterestAPI(username) {
 		key = key.replace(/\//g, '-');
 		var cacheFile = './' + cachePrefix + key + '.cache';
 
-		fs.writeFile(cacheFile, contents, function(err) {
+		fs.writeFile(cacheFile, contents, function (err) {
 			if (err) {
 				console.error('Error adding response to cache at ' + cacheFile);
 				throw err;
@@ -91,7 +92,7 @@ function pinterestAPI(username) {
 	 */
 
 	function getJSON(url, callback) {
-		request(url, function(err, response, body) {
+		request(url, function (err, response, body) {
 			if (err) {
 				console.error('Error making GET request to endpoint ' + url);
 				throw err;
@@ -114,8 +115,6 @@ function pinterestAPI(username) {
 
 	function buildResponse(data) {
 		var response = {};
-		console.log(itemsPerPage);
-		console.log(currentPage);
 		response.totalItems = data.length;
 		response.itemsPerPage = itemsPerPage;
 		response.totalPages = Math.ceil(data.length / itemsPerPage);
@@ -168,25 +167,35 @@ function pinterestAPI(username) {
 	/*
 	 * Get all the boards for the user
 	 *
-	 * @param boolean intern
+	 * @param boolean paginate
 	 * @param Function callback
 	 * @invoke callback(Array boards)
 	 */
 
-	function getBoards(callback) {
+	function getBoards(paginate, callback) {
 		var boardsResponse;
 
 		// Check for cache existence
-		getCache('boards_' + username, function(cacheData) {
+		getCache('boards_' + username, function (cacheData) {
 			if (cacheData === null) {
 				// Create get request and put it in the cache
 				getJSON('http://pinterestapi.co.uk/' + username + '/boards', function (response) {
 					putCache('boards_' + username, JSON.stringify(response));
 					boardsResponse = buildResponse(response.body);
 					callback(buildResponse(response.body));
+					if (paginate) {
+						boardsResponse = buildResponse(response.body);
+					} else {
+						boardsResponse = response.body;
+					}
+					callback(boardsResponse);
 				});
 			} else {
-				boardsResponse = buildResponse(JSON.parse(cacheData).body);
+				if (paginate) {
+					boardsResponse = buildResponse(JSON.parse(cacheData).body);
+				} else {
+					boardsResponse = JSON.parse(cacheData).body;
+				}
 				callback(boardsResponse);
 			}
 		});
@@ -196,30 +205,72 @@ function pinterestAPI(username) {
      * Get pins from a single board
      *
      * @param string board
+     * @param boolean paginate
      * @param Function callback
      * @invoke callback(JSON pins)
      */
 
-	function getPinsFromBoard(board, callback) {
+	function getPinsFromBoard(board, paginate, callback) {
 		var pins;
 
 		getCache(board, function (cacheData) {
 			if (cacheData === null) {
 				// Get data and put it in the cache
 				getJSON('https://api.pinterest.com/v3/pidgets/boards/' + username + '/' + board + '/pins/', function (response) {
-					putCache(board, JSON.stringify(response));
-					pins = buildResponse(response.data.pins);
+					putCache(board, JSON.stringify(response))
+					if (paginate) {
+						pins = buildResponse(response.data.pins);
+					} else {
+						pins = response.data.pins;
+					}
 					callback(pins);
 				});
 			} else {
-				pins = buildResponse(JSON.parse(cacheData).data.pins);
+				if (paginate) {
+					pins = buildResponse(JSON.parse(cacheData).data.pins);
+				} else {
+					pins = JSON.parse(cacheData).data.pins;
+				}
 				callback(pins);
 			}
 		});
 	}
 
+	/*
+     * Get all the user's pins (from all boards we can get)
+     * Pins are sorted descending
+     *
+     * @param Function callback
+     * @invoke callback(Array pins)
+     */
+
+	function getPins(callback) {
+		var allPins = [];
+		getBoards(false, function (boards) {
+			async.each(boards, function(board, asyncCallback) {
+				var splitHref = board.href.split('/');
+				if (splitHref[1] === username) { // it's possible to have boards listed from other users
+					var boardHref = board.href.split('/')[2];
+					getPinsFromBoard(boardHref, false, function (pins) {
+						allPins = allPins.concat(pins);
+						asyncCallback();
+					});
+				} else {
+					asyncCallback();
+				}
+			},
+			function (err) {
+				if (err) {
+					console.error('Error iterating through each board to get pins');
+					throw err;
+				}
+				callback(allPins);
+			});
+		});
+	}
 
 	return {
+		getPins: getPins,
 		getBoards: getBoards,
 		getPinsFromBoard: getPinsFromBoard,
 		getCurrentPage: getCurrentPage,
@@ -228,9 +279,3 @@ function pinterestAPI(username) {
 		setItemsPerPage: setItemsPerPage
 	};
 }
-
-var test = pinterestAPI('bobbibrown');
-test.getPinsFromBoard('bobbi-brown-%2B-girl-rising', function(boards) {
-
-	console.log(boards);
-});
