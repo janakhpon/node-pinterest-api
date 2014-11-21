@@ -217,7 +217,7 @@ function pinterestAPI(username) {
 			if (cacheData === null) {
 				// Get data and put it in the cache
 				getJSON('https://api.pinterest.com/v3/pidgets/boards/' + username + '/' + board + '/pins/', function (response) {
-					putCache(board, JSON.stringify(response))
+					putCache(board, JSON.stringify(response));
 					if (paginate) {
 						pins = buildResponse(response.data.pins);
 					} else {
@@ -264,7 +264,7 @@ function pinterestAPI(username) {
 					console.error('Error iterating through each board to get pins');
 					throw err;
 				}
-				callback(allPins);
+				callback(buildResponse(allPins));
 			});
 		});
 	}
