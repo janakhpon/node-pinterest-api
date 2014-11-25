@@ -10,16 +10,16 @@ var fs		= require('fs'),
  * @param String username
  */
 
-function pinterestAPI(username) {
-	fs.exists('./cache', function (exists) {
+module.exports = function (username) {
+	fs.exists(__dirname + '/cache', function (exists) {
 		if (!exists) {
-			fs.mkdir('./cache');
+			fs.mkdir(__dirname + '/cache');
 		}
 	});
 
 	// private members
 	var cachePrefix = 'cache/pinterest_',
-		itemsPerPage = 25,
+		itemsPerPage = null, // all results on 1 page by default
 		currentPage = 1;
 
 	/* 
@@ -32,7 +32,7 @@ function pinterestAPI(username) {
 
 	function getCache(key, callback) {
 		key = key.replace(/\//g, '-');
-		var cacheFile = './' + cachePrefix + key + '.cache';
+		var cacheFile = __dirname + '/' + cachePrefix + key + '.cache';
 		fs.exists(cacheFile, function (exists) {
 			if (exists) {
 				fs.stat(cacheFile, function (err, stats) {
@@ -71,7 +71,7 @@ function pinterestAPI(username) {
 
 	function putCache(key, contents, callback) {
 		key = key.replace(/\//g, '-');
-		var cacheFile = './' + cachePrefix + key + '.cache';
+		var cacheFile = __dirname + '/' + cachePrefix + key + '.cache';
 
 		fs.writeFile(cacheFile, contents, function (err) {
 			if (err) {
@@ -91,7 +91,7 @@ function pinterestAPI(username) {
 	 * @invoke callback(JSON response)
 	 */
 
-	function getJSON(url, callback) {
+	function get(url, callback) {
 		request(url, function (err, response, body) {
 			if (err) {
 				console.error('Error making GET request to endpoint ' + url);
@@ -101,6 +101,7 @@ function pinterestAPI(username) {
 			if (response.statusCode !== 200) {
 				throw new Error('Did not receive a 200 response when making GET request to endpoint ' + url);
 			}
+
 
 			callback(JSON.parse(body));
 		});
@@ -117,9 +118,9 @@ function pinterestAPI(username) {
 		var response = {};
 		response.totalItems = data.length;
 		response.itemsPerPage = itemsPerPage;
-		response.totalPages = Math.ceil(data.length / itemsPerPage);
-		response.currentPage = currentPage;
-		response.data = data.slice(itemsPerPage * (currentPage - 1), itemsPerPage);
+		response.totalPages = itemsPerPage === null ? 1 : Math.ceil(data.length / itemsPerPage);
+		response.currentPage = itemsPerPage === null ? 1 : currentPage;
+		response.data = itemsPerPage === null ? data : data.slice(itemsPerPage * (currentPage - 1), itemsPerPage);
 
 		return response;
 	}
@@ -129,7 +130,7 @@ function pinterestAPI(username) {
 	/*
 	 * Set itemsPerPage variable
 	 *
-	 * @param Number newItemsPerPage
+	 * @param Mixed newItemsPerPage
 	 */
 
 	function setItemsPerPage(newItemsPerPage) {
@@ -179,10 +180,9 @@ function pinterestAPI(username) {
 		getCache('boards_' + username, function (cacheData) {
 			if (cacheData === null) {
 				// Create get request and put it in the cache
-				getJSON('http://pinterestapi.co.uk/' + username + '/boards', function (response) {
+				get('http://pinterestapi.co.uk/' + username + '/boards', function (response) {
 					putCache('boards_' + username, JSON.stringify(response));
 					boardsResponse = buildResponse(response.body);
-					callback(buildResponse(response.body));
 					if (paginate) {
 						boardsResponse = buildResponse(response.body);
 					} else {
@@ -216,7 +216,7 @@ function pinterestAPI(username) {
 		getCache(board, function (cacheData) {
 			if (cacheData === null) {
 				// Get data and put it in the cache
-				getJSON('https://api.pinterest.com/v3/pidgets/boards/' + username + '/' + board + '/pins/', function (response) {
+				get('https://api.pinterest.com/v3/pidgets/boards/' + username + '/' + board.replace(/#/g, '') + '/pins/', function (response) {
 					putCache(board, JSON.stringify(response));
 					if (paginate) {
 						pins = buildResponse(response.data.pins);
@@ -278,6 +278,4 @@ function pinterestAPI(username) {
 		getItemsPerPage: getItemsPerPage,
 		setItemsPerPage: setItemsPerPage
 	};
-}
-
-module.exports = pinterestAPI;
+};
