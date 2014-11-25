@@ -279,3 +279,5 @@ function pinterestAPI(username) {
 		setItemsPerPage: setItemsPerPage
 	};
 }
+
+module.exports = pinterestAPI;
