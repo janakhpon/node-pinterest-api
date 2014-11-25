@@ -1,8 +1,8 @@
 {
-  "name": "pinterestAPI",
+  "name": "pinterest-api",
   "version": "1.0.0",
-  "description": "An unofficial API to get all the pins and boards from a Pinterest user",
-  "main": "app.js",
+  "description": "Node wrapper for the unofficial Pinterest API",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -11,7 +11,7 @@
     "api"
   ],
   "author": "Inside Social",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "async": "^0.9.0",
     "request": "^2.48.0"

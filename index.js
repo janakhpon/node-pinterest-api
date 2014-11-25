@@ -5,7 +5,7 @@ var fs		= require('fs'),
 	async	= require('async');
 
 /*
- * Constructor that will set the username
+ * Constructor function
  *
  * @param String username
  */
