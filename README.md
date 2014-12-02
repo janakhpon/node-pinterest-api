@@ -1,4 +1,4 @@
-interest-api
+pinterest-api
 ==================
 
 node client for the unofficial API to get pins and boards from a Pinterest user. Note that due to limitations in the unofficial API, this app will retrieve at most 50 pins per board.
