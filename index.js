@@ -41,16 +41,19 @@ function getCache(key, callback) {
 						} catch(e) {
 							dataObj = null;
 						}
-						return callback(dataObj);
+						callback(dataObj);
+						return;
 					});
 				} else {
 					// The cache is older than 60 minutes
-					return callback(null);
+					callback(null);
+					return;
 				}
 			});
 		} else {
 			// The cache doesn't exist
-			return callback(null);
+			callback(null);
+			return;
 		}
 	});
 }
@@ -73,7 +76,8 @@ function putCache(key, contents, callback) {
 			console.error('Error adding response to cache at ' + cacheFile);
 			throw err;
 		} else if (callback) {
-			return callback();
+			callback();
+			return;
 		}
 	});
 }
@@ -98,7 +102,8 @@ function get(url, callback) {
 			throw new Error('Did not receive a 200 response when making GET request to endpoint ' + url);
 		}
 
-		return callback(JSON.parse(body));
+		callback(JSON.parse(body));
+		return;
 	});
 }
 
@@ -196,7 +201,8 @@ function constructor(username) {
 					} else {
 						boardsResponse = response.body;
 					}
-					return callback(boardsResponse);
+					callback(boardsResponse);
+					return;
 				});
 			} else {
 				if (paginate) {
@@ -204,7 +210,8 @@ function constructor(username) {
 				} else {
 					boardsResponse = cacheData.body;
 				}
-				return callback(boardsResponse);
+				callback(boardsResponse);
+				return;
 			}
 		});
 	}
@@ -231,7 +238,8 @@ function constructor(username) {
 					} else {
 						pins = response.data.pins;
 					}
-					return callback(pins);
+					callback(pins);
+					return;
 				});
 			} else {
 				if (paginate) {
@@ -239,7 +247,8 @@ function constructor(username) {
 				} else {
 					pins = cacheData.data.pins;
 				}
-				return callback(pins);
+				callback(pins);
+				return;
 			}
 		});
 	}
@@ -271,7 +280,8 @@ function constructor(username) {
 					console.error('Error iterating through each board to get pins');
 					throw err;
 				}
-				return callback(buildResponse(allPins));
+				callback(buildResponse(allPins));
+				return;
 			});
 		});
 	}
@@ -307,7 +317,7 @@ constructor.getDataForPins = function(pinIds, callback) {
 		groupedPinIds.push(pinIdGroup);
 	}
 
-	async.each(groupedPinIds, function(groupOfPinIds, asyncCallback) {
+	async.eachLimit(groupedPinIds, 50, function(groupOfPinIds, asyncCallback) {
 		var pinIdsString = groupOfPinIds.join(',');
 		getCache(pinIdsString, function (cacheData) {
 			if (cacheData === null) {
@@ -326,7 +336,8 @@ constructor.getDataForPins = function(pinIds, callback) {
 			console.error('Error iterating through groups of pin IDs');
 			throw err;
 		}
-		return callback(buildResponse(allPinsData));
+		callback(buildResponse(allPinsData));
+		return;
 	});
 
 };
