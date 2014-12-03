@@ -46,7 +46,14 @@ module.exports = function (username) {
 								console.error('Error reading the cache file at ' + cacheFile);
 								throw err;
 							}
-							return callback(data.toString());
+							var dataString = data.toString();
+							var dataObj;
+							try {
+								dataObj = JSON.parse(dataString);
+							} catch(e) {
+								dataObj = null;
+							}
+							return callback(dataObj);
 						});
 					} else {
 						// The cache is older than 60 minutes
@@ -192,9 +199,9 @@ module.exports = function (username) {
 				});
 			} else {
 				if (paginate) {
-					boardsResponse = buildResponse(JSON.parse(cacheData).body);
+					boardsResponse = buildResponse(cacheData.body);
 				} else {
-					boardsResponse = JSON.parse(cacheData).body;
+					boardsResponse = cacheData.body;
 				}
 				return callback(boardsResponse);
 			}
@@ -227,9 +234,9 @@ module.exports = function (username) {
 				});
 			} else {
 				if (paginate) {
-					pins = buildResponse(JSON.parse(cacheData).data.pins);
+					pins = buildResponse(cacheData.data.pins);
 				} else {
-					pins = JSON.parse(cacheData).data.pins;
+					pins = cacheData.data.pins;
 				}
 				return callback(pins);
 			}
@@ -296,7 +303,7 @@ module.exports = function (username) {
 						asyncCallback();
 					});
 				} else {
-					allPinsData = allPinsData.concat(JSON.parse(cacheData).data);
+					allPinsData = allPinsData.concat(cacheData.data);
 					asyncCallback();
 				}
 			});
