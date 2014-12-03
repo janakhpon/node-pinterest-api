@@ -279,10 +279,10 @@ module.exports = function (username) {
 	function getDataForPins(pinIds, callback) {
 		var allPinsData = [];
 		var groupedPinIds = [];
+		var APIMaxPinsAllowedPerRequest = 10;
 
-		for (var i = 0; i < pinIds.length; i += 10) {
-			console.log(i, i+10);
-			var pinIdGroup = pinIds.slice(i, i + 10);
+		for (var i = 0; i < pinIds.length; i += APIMaxPinsAllowedPerRequest) {
+			var pinIdGroup = pinIds.slice(i, i + APIMaxPinsAllowedPerRequest);
 			groupedPinIds.push(pinIdGroup);
 		}
 
