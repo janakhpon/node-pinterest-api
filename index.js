@@ -46,16 +46,16 @@ module.exports = function (username) {
 								console.error('Error reading the cache file at ' + cacheFile);
 								throw err;
 							}
-							callback(data.toString());
+							return callback(data.toString());
 						});
 					} else {
 						// The cache is older than 60 minutes
-						callback(null);
+						return callback(null);
 					}
 				});
 			} else {
 				// The cache doesn't exist
-				callback(null);
+				return callback(null);
 			}
 		});
 	}
@@ -78,7 +78,7 @@ module.exports = function (username) {
 				console.error('Error adding response to cache at ' + cacheFile);
 				throw err;
 			} else if (callback) {
-				callback();
+				return callback();
 			}
 		});
 	}
@@ -88,7 +88,7 @@ module.exports = function (username) {
 	 *
 	 * @param string url
 	 * @param Function callback
-	 * @invoke callback(JSON response)
+	 * @invoke callback(Object response)
 	 */
 
 	function get(url, callback) {
@@ -99,11 +99,11 @@ module.exports = function (username) {
 			}
 
 			if (response.statusCode !== 200) {
+				console.error(response);
 				throw new Error('Did not receive a 200 response when making GET request to endpoint ' + url);
 			}
 
-
-			callback(JSON.parse(body));
+			return callback(JSON.parse(body));
 		});
 	}
 
@@ -170,7 +170,7 @@ module.exports = function (username) {
 	 *
 	 * @param boolean paginate
 	 * @param Function callback
-	 * @invoke callback(Array boards)
+	 * @invoke callback(Mixed boards)
 	 */
 
 	function getBoards(paginate, callback) {
@@ -188,7 +188,7 @@ module.exports = function (username) {
 					} else {
 						boardsResponse = response.body;
 					}
-					callback(boardsResponse);
+					return callback(boardsResponse);
 				});
 			} else {
 				if (paginate) {
@@ -196,7 +196,7 @@ module.exports = function (username) {
 				} else {
 					boardsResponse = JSON.parse(cacheData).body;
 				}
-				callback(boardsResponse);
+				return callback(boardsResponse);
 			}
 		});
 	}
@@ -207,7 +207,7 @@ module.exports = function (username) {
      * @param string board
      * @param boolean paginate
      * @param Function callback
-     * @invoke callback(JSON pins)
+     * @invoke callback(Mixed pins)
      */
 
 	function getPinsFromBoard(board, paginate, callback) {
@@ -223,7 +223,7 @@ module.exports = function (username) {
 					} else {
 						pins = response.data.pins;
 					}
-					callback(pins);
+					return callback(pins);
 				});
 			} else {
 				if (paginate) {
@@ -231,17 +231,16 @@ module.exports = function (username) {
 				} else {
 					pins = JSON.parse(cacheData).data.pins;
 				}
-				callback(pins);
+				return callback(pins);
 			}
 		});
 	}
 
 	/*
      * Get all the user's pins (from all boards we can get)
-     * Pins are sorted descending
      *
      * @param Function callback
-     * @invoke callback(Array pins)
+     * @invoke callback(Object pins)
      */
 
 	function getPins(callback) {
@@ -264,12 +263,55 @@ module.exports = function (username) {
 					console.error('Error iterating through each board to get pins');
 					throw err;
 				}
-				callback(buildResponse(allPins));
+				return callback(buildResponse(allPins));
 			});
 		});
 	}
 
+	/*
+     * Get data on pinIds
+     *
+     * @param Array pinIds
+     * @param Function callback
+     * @invoke callback(Object pins)
+     */
+
+	function getDataForPins(pinIds, callback) {
+		var allPinsData = [];
+		var groupedPinIds = [];
+
+		for (var i = 0; i < pinIds.length; i += 10) {
+			console.log(i, i+10);
+			var pinIdGroup = pinIds.slice(i, i + 10);
+			groupedPinIds.push(pinIdGroup);
+		}
+
+		async.each(groupedPinIds, function(groupOfPinIds, asyncCallback) {
+			var pinIdsString = groupOfPinIds.join(',');
+			getCache(pinIdsString, function (cacheData) {
+				if (cacheData === null) {
+					get('http://api.pinterest.com/v3/pidgets/pins/info/?pin_ids=' + pinIdsString, function (response) {
+						putCache(pinIdsString, JSON.stringify(response));
+						allPinsData = allPinsData.concat(response.data);
+						asyncCallback();
+					});
+				} else {
+					allPinsData = allPinsData.concat(JSON.parse(cacheData).data);
+					asyncCallback();
+				}
+			});
+		}, function (err) {
+			if (err) {
+				console.error('Error iterating through groups of pin IDs');
+				throw err;
+			}
+			return callback(buildResponse(allPinsData));
+		});
+
+	}
+
 	return {
+		getDataForPins: getDataForPins,
 		getPins: getPins,
 		getBoards: getBoards,
 		getPinsFromBoard: getPinsFromBoard,
