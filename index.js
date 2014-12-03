@@ -4,6 +4,11 @@ var fs		= require('fs'),
 	request = require('request'),
 	async	= require('async');
 
+fs.exists(__dirname + '/cache', function (exists) {
+	if (!exists) {
+		fs.mkdir(__dirname + '/cache');
+	}
+});
 
 // private members
 var CACHE_PREFIX = 'cache/pinterest_',
@@ -132,12 +137,6 @@ function buildResponse(data) {
  */
 
 function constructor(username) {
-	fs.exists(__dirname + '/cache', function (exists) {
-		if (!exists) {
-			fs.mkdir(__dirname + '/cache');
-		}
-	});
-
 	// public members
 
 	/*
