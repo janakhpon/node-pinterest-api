@@ -3,7 +3,7 @@ pinterest-api
 
 node client for the unofficial API to get pins and boards from a Pinterest user. Note that due to limitations in the unofficial API, this app will retrieve at most 50 pins per board.
 
-Thanks to github user TakeTwoMerkidentiteit for making his/her PHP client for the unofficial Pinterest API, from which I more or less ported this (https://github.com/TakeTwoMerkidentiteit/Pinterest-API)
+Thanks to github user TakeTwoMerkidentiteit for making his/her PHP client for the unofficial Pinterest API, from which I roughly ported most of the methods (https://github.com/TakeTwoMerkidentiteit/Pinterest-API)
 
 To install:
 ```
@@ -32,6 +32,11 @@ pinterest.getPins(function (pins) {
 // Get all boards (first parameter determines whether you want the results pagined and to include some metadata)
 pinterest.getBoards(true, function (boards) {
 	...
+});
+
+// Get data for pins (note that this is a static method (a method of the class itself) since it does not rely on any state)
+pinterestAPI.getDataForPins(arrayOfPinIds, function (data) {
+    ...
 });
 ```
 
