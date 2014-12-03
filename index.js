@@ -4,133 +4,134 @@ var fs		= require('fs'),
 	request = require('request'),
 	async	= require('async');
 
+
+// private members
+var CACHE_PREFIX = 'cache/pinterest_',
+	itemsPerPage = null, // all results on 1 page by default
+	currentPage = 1;
+
+/* 
+ * Get the item from the cache if exists
+ *
+ * @param string key
+ * @param Function callback
+ * @invoke callback(mixed response)
+ */
+
+function getCache(key, callback) {
+	key = key.replace(/\//g, '-');
+	var cacheFile = __dirname + '/' + CACHE_PREFIX + key + '.cache';
+	fs.exists(cacheFile, function (exists) {
+		if (exists) {
+			fs.stat(cacheFile, function (err, stats) {
+				if (err) {
+					throw err;
+				}
+				if (stats.mtime.valueOf() > (new Date().valueOf() - 60 * 60 * 1000)) {
+					// The cache is less than 60 minutes old so return the contents
+					fs.readFile(cacheFile, function (err, data) {
+						if (err) {
+							console.error('Error reading the cache file at ' + cacheFile);
+							throw err;
+						}
+						var dataString = data.toString();
+						var dataObj;
+						try {
+							dataObj = JSON.parse(dataString);
+						} catch(e) {
+							dataObj = null;
+						}
+						return callback(dataObj);
+					});
+				} else {
+					// The cache is older than 60 minutes
+					return callback(null);
+				}
+			});
+		} else {
+			// The cache doesn't exist
+			return callback(null);
+		}
+	});
+}
+
+/* 
+ * Put an item in the cache
+ *
+ * @param string key
+ * @param JSON contents
+ * @param Function callback (optional)
+ * @invoke callback()
+ */
+
+function putCache(key, contents, callback) {
+	key = key.replace(/\//g, '-');
+	var cacheFile = __dirname + '/' + CACHE_PREFIX + key + '.cache';
+
+	fs.writeFile(cacheFile, contents, function (err) {
+		if (err) {
+			console.error('Error adding response to cache at ' + cacheFile);
+			throw err;
+		} else if (callback) {
+			return callback();
+		}
+	});
+}
+
+/* 
+ * Method to make GET request
+ *
+ * @param string url
+ * @param Function callback
+ * @invoke callback(Object response)
+ */
+
+function get(url, callback) {
+	request(url, function (err, response, body) {
+		if (err) {
+			console.error('Error making GET request to endpoint ' + url);
+			throw err;
+		}
+
+		if (response.statusCode !== 200) {
+			console.error(response);
+			throw new Error('Did not receive a 200 response when making GET request to endpoint ' + url);
+		}
+
+		return callback(JSON.parse(body));
+	});
+}
+
+/* 
+ * Build the response, wraps the data in some extra information like currentpage etc.
+ *
+ * @param Array data
+ * @return Object response
+ */
+
+function buildResponse(data) {
+	var response = {};
+	response.totalItems = data.length;
+	response.itemsPerPage = itemsPerPage;
+	response.totalPages = itemsPerPage === null ? 1 : Math.ceil(data.length / itemsPerPage);
+	response.currentPage = itemsPerPage === null ? 1 : currentPage;
+	response.data = itemsPerPage === null ? data : data.slice(itemsPerPage * (currentPage - 1), itemsPerPage);
+
+	return response;
+}
+
 /*
  * Constructor function
  *
  * @param String username
  */
 
-module.exports = function (username) {
+function constructor(username) {
 	fs.exists(__dirname + '/cache', function (exists) {
 		if (!exists) {
 			fs.mkdir(__dirname + '/cache');
 		}
 	});
-
-	// private members
-	var cachePrefix = 'cache/pinterest_',
-		itemsPerPage = null, // all results on 1 page by default
-		currentPage = 1;
-
-	/* 
-	 * Get the item from the cache if exists
-	 *
-	 * @param string key
-	 * @param Function callback
-	 * @invoke callback(mixed response)
-	 */
-
-	function getCache(key, callback) {
-		key = key.replace(/\//g, '-');
-		var cacheFile = __dirname + '/' + cachePrefix + key + '.cache';
-		fs.exists(cacheFile, function (exists) {
-			if (exists) {
-				fs.stat(cacheFile, function (err, stats) {
-					if (err) {
-						throw err;
-					}
-					if (stats.mtime.valueOf() > (new Date().valueOf() - 60 * 60 * 1000)) {
-						// The cache is less than 60 minutes old so return the contents
-						fs.readFile(cacheFile, function (err, data) {
-							if (err) {
-								console.error('Error reading the cache file at ' + cacheFile);
-								throw err;
-							}
-							var dataString = data.toString();
-							var dataObj;
-							try {
-								dataObj = JSON.parse(dataString);
-							} catch(e) {
-								dataObj = null;
-							}
-							return callback(dataObj);
-						});
-					} else {
-						// The cache is older than 60 minutes
-						return callback(null);
-					}
-				});
-			} else {
-				// The cache doesn't exist
-				return callback(null);
-			}
-		});
-	}
-
-	/* 
-	 * Put an item in the cache
-	 *
-	 * @param string key
-	 * @param JSON contents
-	 * @param Function callback (optional)
-	 * @invoke callback()
-	 */
-
-	function putCache(key, contents, callback) {
-		key = key.replace(/\//g, '-');
-		var cacheFile = __dirname + '/' + cachePrefix + key + '.cache';
-
-		fs.writeFile(cacheFile, contents, function (err) {
-			if (err) {
-				console.error('Error adding response to cache at ' + cacheFile);
-				throw err;
-			} else if (callback) {
-				return callback();
-			}
-		});
-	}
-
-	/* 
-	 * Method to make GET request
-	 *
-	 * @param string url
-	 * @param Function callback
-	 * @invoke callback(Object response)
-	 */
-
-	function get(url, callback) {
-		request(url, function (err, response, body) {
-			if (err) {
-				console.error('Error making GET request to endpoint ' + url);
-				throw err;
-			}
-
-			if (response.statusCode !== 200) {
-				console.error(response);
-				throw new Error('Did not receive a 200 response when making GET request to endpoint ' + url);
-			}
-
-			return callback(JSON.parse(body));
-		});
-	}
-
-	/* 
-     * Build the response, wraps the data in some extra information like currentpage etc.
-     *
-     * @param Array data
-     * @return Object response
-     */
-
-	function buildResponse(data) {
-		var response = {};
-		response.totalItems = data.length;
-		response.itemsPerPage = itemsPerPage;
-		response.totalPages = itemsPerPage === null ? 1 : Math.ceil(data.length / itemsPerPage);
-		response.currentPage = itemsPerPage === null ? 1 : currentPage;
-		response.data = itemsPerPage === null ? data : data.slice(itemsPerPage * (currentPage - 1), itemsPerPage);
-
-		return response;
-	}
 
 	// public members
 
@@ -275,50 +276,7 @@ module.exports = function (username) {
 		});
 	}
 
-	/*
-     * Get data on pinIds
-     *
-     * @param Array pinIds
-     * @param Function callback
-     * @invoke callback(Object pins)
-     */
-
-	function getDataForPins(pinIds, callback) {
-		var allPinsData = [];
-		var groupedPinIds = [];
-		var APIMaxPinsAllowedPerRequest = 10;
-
-		for (var i = 0; i < pinIds.length; i += APIMaxPinsAllowedPerRequest) {
-			var pinIdGroup = pinIds.slice(i, i + APIMaxPinsAllowedPerRequest);
-			groupedPinIds.push(pinIdGroup);
-		}
-
-		async.each(groupedPinIds, function(groupOfPinIds, asyncCallback) {
-			var pinIdsString = groupOfPinIds.join(',');
-			getCache(pinIdsString, function (cacheData) {
-				if (cacheData === null) {
-					get('http://api.pinterest.com/v3/pidgets/pins/info/?pin_ids=' + pinIdsString, function (response) {
-						putCache(pinIdsString, JSON.stringify(response));
-						allPinsData = allPinsData.concat(response.data);
-						asyncCallback();
-					});
-				} else {
-					allPinsData = allPinsData.concat(cacheData.data);
-					asyncCallback();
-				}
-			});
-		}, function (err) {
-			if (err) {
-				console.error('Error iterating through groups of pin IDs');
-				throw err;
-			}
-			return callback(buildResponse(allPinsData));
-		});
-
-	}
-
 	return {
-		getDataForPins: getDataForPins,
 		getPins: getPins,
 		getBoards: getBoards,
 		getPinsFromBoard: getPinsFromBoard,
@@ -327,4 +285,50 @@ module.exports = function (username) {
 		getItemsPerPage: getItemsPerPage,
 		setItemsPerPage: setItemsPerPage
 	};
+}
+
+// Static methods
+
+/*
+ * Get data on pinIds
+ *
+ * @param Array pinIds
+ * @param Function callback
+ * @invoke callback(Object pins)
+ */
+
+constructor.getDataForPins = function(pinIds, callback) {
+	var allPinsData = [];
+	var groupedPinIds = [];
+	var APIMaxPinsAllowedPerRequest = 10;
+
+	for (var i = 0; i < pinIds.length; i += APIMaxPinsAllowedPerRequest) {
+		var pinIdGroup = pinIds.slice(i, i + APIMaxPinsAllowedPerRequest);
+		groupedPinIds.push(pinIdGroup);
+	}
+
+	async.each(groupedPinIds, function(groupOfPinIds, asyncCallback) {
+		var pinIdsString = groupOfPinIds.join(',');
+		getCache(pinIdsString, function (cacheData) {
+			if (cacheData === null) {
+				get('http://api.pinterest.com/v3/pidgets/pins/info/?pin_ids=' + pinIdsString, function (response) {
+					putCache(pinIdsString, JSON.stringify(response));
+					allPinsData = allPinsData.concat(response.data);
+					asyncCallback();
+				});
+			} else {
+				allPinsData = allPinsData.concat(cacheData.data);
+				asyncCallback();
+			}
+		});
+	}, function (err) {
+		if (err) {
+			console.error('Error iterating through groups of pin IDs');
+			throw err;
+		}
+		return callback(buildResponse(allPinsData));
+	});
+
 };
+
+module.exports = constructor;
