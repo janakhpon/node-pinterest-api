@@ -64,7 +64,10 @@ There is a very simple file caching system in place. The script will try to crea
 
 Returned Data
 =================
-The API returns an object. Below is an example (remember that items_per_page is null by default, and just means all data will be on first page):
+The API returns an object. Below is an example (remember that items_per_page is null by default, and just means all data will be on first page).
+
+Note that the unofficial Pinterest API does not return dates, so we use the boards RSS feeds to get as many dates as possible and add them to the data objects.
+If the date fields are empty strings, it just means we could not get them. Currently working on internally scraping pin pages to get dates from the HTML.
 
 ```
 {
@@ -99,7 +102,8 @@ The API returns an object. Below is an example (remember that items_per_page is 
             },
             embed: null,
             is_video: false,
-            id: "506443920570421590"
+            id: "506443920570421590",
+            created_at: Tue Feb 12 2013 09:44:33 GMT-0800 (PST)
         },
         [...]
     ]
