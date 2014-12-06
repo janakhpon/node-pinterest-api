@@ -1,6 +1,6 @@
 {
   "name": "pinterest-api",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Node wrapper for the unofficial Pinterest API",
   "main": "index.js",
   "repository": {
@@ -21,7 +21,8 @@
   "license": "MIT",
   "dependencies": {
     "async": "^0.9.0",
-    "request": "^2.48.0"
+    "request": "^2.48.0",
+    "xml2js": "^0.4.4"
   },
   "engines": {
     "node": "0.10.21"
