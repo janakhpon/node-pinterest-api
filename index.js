@@ -1,9 +1,11 @@
 'use strict';
 
-var fs			= require('fs'),
-	request 	= require('request'),
-	async		= require('async'),
-	parseString	= require('xml2js').parseString;
+var fs				= require('fs'),
+	request 		= require('request'),
+	async			= require('async'),
+	cheerio			= require('cheerio'),
+	reverseTimeAgo	= require('./lib/reverseTimeAgo'),
+	parseString		= require('xml2js').parseString;
 
 fs.exists(__dirname + '/cache', function (exists) {
 	if (!exists) {
@@ -47,7 +49,8 @@ function getCache(key, callback) {
 						} catch(e) {
 							dataObj = null;
 						}
-						callback(dataObj);
+
+						callback(dataObj, stats.mtime);
 						return;
 					});
 				} else {
@@ -147,6 +150,17 @@ function getPinIdFromUrl(pinUrl) {
 }
 
 /*
+ * Create the url for a specific pin
+ *
+ * @param String pinId
+ * @return String pinUrl
+ */
+
+function createPinUrl(pinId) {
+	return 'http://www.pinterest.com/pin/' + pinId + '/';
+}
+
+/*
  * Create a map of pin IDs to publish dates based on the object created using the XML parseString library
  *
  * @param Object xmlObject
@@ -188,7 +202,7 @@ function getPinDateMapFromBoardRssGetResponse(response, board, callback) {
 }
 
 /*
- * Get publish dates for each pin on a board (max 50)
+ * Get publish dates for each pin on a board based on RSS
  *
  * @param String board
  * @param Function callback
@@ -205,6 +219,55 @@ function getDatesForBoardPinsFromRss(username, board, callback) {
 		} else {
 			getPinDateMapFromBoardRssGetResponse(cacheData, board, callback);
 		}
+	});
+}
+
+function parseHtmlAndGetEarliestPossibleDate(html, date) {
+	var $ = cheerio.load(html);
+	var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
+	return reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText, date);
+}
+
+/*
+ * Get publish dates for pins through scraping
+ *
+ * @param Array pinIds
+ * @param Function callback
+ * @invokes callback(Object pinDateMap)
+ */
+
+function getDatesForPinsFromScraping(pinIds, callback) {
+	var pinDateMap = {};
+	async.eachLimit(pinIds, 10, function (pinId, asyncCallback) {
+		getCache(pinId + '_HTML', function (cacheData, dateCached) {
+			if (cacheData === null) {
+				var getOptions = {
+				'url': createPinUrl(pinId),
+				'gzip': true,
+				'headers': {
+					'Accept-Language': 'en-US,en;q=0.5',
+					'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+					// Adding the User-Agent is what fixed the weird no data on es subdomains bug
+					// Probably possible to use something else, but this worked.
+					'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0',
+					}
+				};
+
+				request.get(getOptions, function(err, res, body) {
+					if (err) { throw err; }
+					putCache(pinId + '_HTML', JSON.stringify(body));
+					pinDateMap[pinId] = parseHtmlAndGetEarliestPossibleDate(body);
+					asyncCallback();
+				});
+
+			} else {
+				pinDateMap[pinId] = parseHtmlAndGetEarliestPossibleDate(cacheData, dateCached);
+				asyncCallback();
+			}
+		});
+	}, function (err) {
+		if (err) { throw err; }
+		callback(pinDateMap);
 	});
 }
 
@@ -330,19 +393,31 @@ function constructor(username) {
 			}],
 			function (err) {
 				if (err) { throw err; }
+				var pinIdsThatNeedDates = [];
 				for (var i = 0; i < pins.length; i++) {
 					pins[i].created_at = '';
 					if (pinDateMap[pins[i].id]) {
 						pins[i].created_at = pinDateMap[pins[i].id];
+						pins[i].created_at_source = 'rss';
+					} else {
+						pinIdsThatNeedDates.push(pins[i].id);
 					}
 				}
 
-				if (paginate) {
-					pins = buildResponse(pins);
-				}
+				getDatesForPinsFromScraping(pinIdsThatNeedDates, function (scrapedPinDateMap) {
+					for (var i = 0; i < pins.length; i++) {
+						if (scrapedPinDateMap[pins[i].id]) {
+							pins[i].created_at = scrapedPinDateMap[pins[i].id];
+							pins[i].created_at_source = 'html';
+						}
+					}
+					if (paginate) {
+						pins = buildResponse(pins);
+					}
 
-				callback(pins);
-				return;
+					callback(pins);
+					return;
+				});
 			}
 		);
 	}
