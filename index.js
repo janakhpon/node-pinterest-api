@@ -49,7 +49,8 @@ function getCache(key, callback) {
 						} catch(e) {
 							dataObj = null;
 						}
-						callback(dataObj);
+
+						callback(dataObj, stats.mtime);
 						return;
 					});
 				} else {
@@ -221,6 +222,12 @@ function getDatesForBoardPinsFromRss(username, board, callback) {
 	});
 }
 
+function parseHtmlAndGetEarliestPossibleDate(html, date) {
+	var $ = cheerio.load(html);
+	var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
+	return reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText, date);
+}
+
 /*
  * Get publish dates for pins through scraping
  *
@@ -229,10 +236,10 @@ function getDatesForBoardPinsFromRss(username, board, callback) {
  * @invokes callback(Object pinDateMap)
  */
 
-function getDatesForBoardPinsFromScraping(pinIds, callback) {
+function getDatesForPinsFromScraping(pinIds, callback) {
 	var pinDateMap = {};
 	async.eachLimit(pinIds, 10, function (pinId, asyncCallback) {
-		getCache(pinId + '_HTML', function (cacheData) {
+		getCache(pinId + '_HTML', function (cacheData, dateCached) {
 			if (cacheData === null) {
 				var getOptions = {
 				'url': createPinUrl(pinId),
@@ -249,27 +256,15 @@ function getDatesForBoardPinsFromScraping(pinIds, callback) {
 				request.get(getOptions, function(err, res, body) {
 					if (err) { throw err; }
 					putCache(pinId + '_HTML', JSON.stringify(body));
-
-					var $ = cheerio.load(body);
-					var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
-					var earliestPossibleDate = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText);
-
-					pinDateMap[pinId] = earliestPossibleDate;
+					pinDateMap[pinId] = parseHtmlAndGetEarliestPossibleDate(body);
 					asyncCallback();
 				});
 
 			} else {
-				var $ = cheerio.load(cacheData);
-				var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
-				var earliestPossibleDate = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText);
-
-				pinDateMap[pinId] = earliestPossibleDate;
+				pinDateMap[pinId] = parseHtmlAndGetEarliestPossibleDate(cacheData, dateCached);
 				asyncCallback();
 			}
-		})
-
-
-		
+		});
 	}, function (err) {
 		if (err) { throw err; }
 		callback(pinDateMap);
@@ -409,7 +404,7 @@ function constructor(username) {
 					}
 				}
 
-				getDatesForBoardPinsFromScraping(pinIdsThatNeedDates, function (scrapedPinDateMap) {
+				getDatesForPinsFromScraping(pinIdsThatNeedDates, function (scrapedPinDateMap) {
 					for (var i = 0; i < pins.length; i++) {
 						if (scrapedPinDateMap[pins[i].id]) {
 							pins[i].created_at = scrapedPinDateMap[pins[i].id];
@@ -517,3 +512,8 @@ constructor.getDataForPins = function(pinIds, callback) {
 };
 
 module.exports = constructor;
+
+var api = constructor('bobbibrown');
+api.getPinsFromBoard('bobbi-brown-%2B-girl-rising', true, function (data) {
+	console.log(data)
+})
