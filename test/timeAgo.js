@@ -36,7 +36,7 @@ describe('reverseTimeAgo', function (){
 		});
 	});
 
-	describe('#getEarliestTimeAgoDateFromTimeAgoText()', function () {
+	describe('#getEarliestPossibleDateFromTimeAgoText()', function () {
 		var testYear = 2014,
 			testMonth = 11,
 			testDay = 8,
@@ -47,9 +47,10 @@ describe('reverseTimeAgo', function (){
 
 		it('should give a date 1 second less than 44 weeks before the test date when given 43 weeks and the test date', function () {
 			var testDate = new Date(testYear, testMonth, testDay, testHour, testMinute, testSecond, testMs);
-			var testTimeInMs = (((4 * 7 * 24 * 60 * 60) - 1) * 1000);
+			var testTimeInMs = (((44 * 7 * 24 * 60 * 60) - 1) * 1000);
+			var t = new Date(testYear, testMonth - 10, testDay - 5, testHour, testMinute, testSecond + 1, testMs);
 			var answerDate = new Date(testDate - testTimeInMs);
-			assert.equal(answerDate.valueOf(), reverseTimeAgo.getEarliestTimeAgoDateFromTimeAgoText('3 weeks ago', testDate).valueOf());
+			assert.equal(t.valueOf(), reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText('43 weeks ago', testDate).valueOf());
 		});
 	});
 });

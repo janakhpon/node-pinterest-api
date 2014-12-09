@@ -1,10 +1,11 @@
 'use strict';
 
-var fs			= require('fs'),
-	request 	= require('request'),
-	async		= require('async'),
-	cheerio		= require('cheerio'),
-	parseString	= require('xml2js').parseString;
+var fs				= require('fs'),
+	request 		= require('request'),
+	async			= require('async'),
+	cheerio			= require('cheerio'),
+	reverseTimeAgo	= require('./lib/reverseTimeAgo'),
+	parseString		= require('xml2js').parseString;
 
 fs.exists(__dirname + '/cache', function (exists) {
 	if (!exists) {
@@ -229,74 +230,51 @@ function getDatesForBoardPinsFromRss(username, board, callback) {
  */
 
 function getDatesForBoardPinsFromScraping(pinIds, callback) {
+	var pinDateMap = {};
 	async.eachLimit(pinIds, 10, function (pinId, asyncCallback) {
-		var getOptions = {
-			'url': createPinUrl(pinId),
-			'gzip': true,
-			'headers': {
-				'Accept-Language': 'en-US,en;q=0.5',
-				'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-				// Adding the User-Agent is what fixed the weird no data on es subdomains bug
-				// Probably possible to use something else, but this worked.
-				'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0',
-			}
-		};
+		getCache(pinId + '_HTML', function (cacheData) {
+			if (cacheData === null) {
+				var getOptions = {
+				'url': createPinUrl(pinId),
+				'gzip': true,
+				'headers': {
+					'Accept-Language': 'en-US,en;q=0.5',
+					'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+					// Adding the User-Agent is what fixed the weird no data on es subdomains bug
+					// Probably possible to use something else, but this worked.
+					'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0',
+					}
+				};
 
-		request.get(getOptions,
-			function(err, res, body) {
-				if (err) { throw err; }
-				var $ = cheerio.load(body);
+				request.get(getOptions,
+					function(err, res, body) {
+						if (err) { throw err; }
+						console.log(typeof body);
+						putCache(pinId + '_HTML', JSON.stringify(body));
+						var $ = cheerio.load(body);
+						var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
+						console.log(timeAgoText);
+						var earliestPossibleDate = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText);
+						pinDateMap[pinId] = earliestPossibleDate;
+						asyncCallback();
+					}
+				);
+			} else {
+				console.log('cached', typeof cacheData)
+				var $ = cheerio.load(cacheData);
 				var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
 				console.log(timeAgoText);
+				var earliestPossibleDate = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText);
+				pinDateMap[pinId] = earliestPossibleDate;
 				asyncCallback();
-
-				
-				// var isCustomerThePinner = $('a[title="Added by"][href="/' + username.toLowerCase() + '/"]').length === 1
-				// if (isCustomerThePinner) { // TODO: we should store the username in the channelAccounts table
-				// 	async.series([function(paracb) {
-				// 			executeQuery('update ' + pinterestCandidatesTable + ' set checked=1 where postUrl=' + mysqlClient.escape(item.postUrl), function() {
-				// 				paracb();
-				// 			});
-				// 		},
-				// 		function(paracb) {
-				// 			// insert into owned posts table
-				// 			var contentUrl = $('.repinLike a').attr('href');
-				// 			var message = $('.commentDescriptionContent').text();
-				// 			customerUrlUtil.getActualUrl(contentUrl, function(unshortenedUrl) {
-				// 				if (customerUrlUtil.isCustomerContentUrl(unshortenedUrl)) {
-				// 					addCustomerHashIdToDb(unshortenedUrl, accountId);
-				// 					executeQuery('insert ' + ownedContentInfoTable + ' (postUrl, contentUrl, originalContentUrl,\
-				// 				 		message, channel, date) values (' +
-				// 						mysqlClient.escape(item.postUrl) + ',' +
-				// 						mysqlClient.escape(customerUrlUtil.standardizeUrl(unshortenedUrl)) + ',' +
-				// 						mysqlClient.escape(message) + ',' +
-				// 						mysqlClient.escape(message) + ',' +
-				// 						mysqlClient.escape('PI') + ',' +
-				// 						mysqlClient.escape(item.date) + ')',
-				// 						function() {
-				// 							count++;
-				// 							paracb();
-				// 						}
-				// 					);
-				// 				} else {
-				// 					paracb();
-				// 				}
-				// 			});
-				// 		}
-				// 	], function() {
-				// 		cb();
-				// 	});
-				// } else {
-				// 	executeQuery('update ' + pinterestCandidatesTable + ' set checked=1 where postUrl=' + mysqlClient.escape(item.postUrl), function() {
-				// 		cb();
-				// 	});
-				// }
-
 			}
-		);
+		})
+
+
+		
 	}, function (err) {
 		if (err) { throw err; }
-		callback();
+		callback(pinDateMap);
 	});
 }
 
@@ -427,12 +405,19 @@ function constructor(username) {
 					pins[i].created_at = '';
 					if (pinDateMap[pins[i].id]) {
 						pins[i].created_at = pinDateMap[pins[i].id];
+						pins[i].created_at_source = 'rss';
 					} else {
 						pinIdsThatNeedDates.push(pins[i].id);
 					}
 				}
 
-				getDatesForBoardPinsFromScraping(pinIdsThatNeedDates, function (dates) {
+				getDatesForBoardPinsFromScraping(pinIdsThatNeedDates, function (scrapedPinDateMap) {
+					for (var i = 0; i < pins.length; i++) {
+						if (scrapedPinDateMap[pins[i].id]) {
+							pins[i].created_at = scrapedPinDateMap[pins[i].id];
+							pins[i].created_at_source = 'html';
+						}
+					}
 					if (paginate) {
 						pins = buildResponse(pins);
 					}

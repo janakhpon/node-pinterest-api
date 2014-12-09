@@ -103,9 +103,19 @@ If the date fields are empty strings, it just means we could not get them. Curre
             embed: null,
             is_video: false,
             id: "506443920570421590",
-            created_at: Tue Feb 12 2013 09:44:33 GMT-0800 (PST)
+            created_at: Tue Feb 12 2013 09:44:33 GMT-0800 (PST),
+            created_at_source: 'rss'
         },
         [...]
     ]
 }
 ```
+
+Misc
+=================
+The JSON for each pin that pinterest gives us does not include the date that the pin was created. Therefore, we use a combination of RSS feeds and scraping to get the dates of the pins.
+However, the accuracy of all dates are not equivalent. The dates obtained from the RSS feeds are accurate, but the dates from scraping have to be inferred based on the 'time ago' text 
+that pinterest shows on the page (i.e. 3 weeks ago). We took the conservative approach of assigning the earliest possible date that could apply to the 'time ago' text. In the '3 weeks ago' 
+example, our date would be 1 second before 4 weeks prior to the current date (the date of the app running) because Pinterest always rounds down when between dates 
+(i.e. if actual date was 3.8 weeks ago, it'd say 3 weeks ago rather than 4 weeks ago). As the accuracy of the date may be important, a 'created_at_source' property on the pin object to 
+show whether the source was rss or html.
