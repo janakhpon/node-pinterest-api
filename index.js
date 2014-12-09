@@ -512,8 +512,3 @@ constructor.getDataForPins = function(pinIds, callback) {
 };
 
 module.exports = constructor;
-
-var api = constructor('bobbibrown');
-api.getPinsFromBoard('bobbi-brown-%2B-girl-rising', true, function (data) {
-	console.log(data)
-})
