@@ -21,10 +21,14 @@
   "license": "MIT",
   "dependencies": {
     "async": "^0.9.0",
+    "cheerio": "^0.18.0",
     "request": "^2.48.0",
     "xml2js": "^0.4.4"
   },
   "engines": {
     "node": "0.10.21"
+  },
+  "devDependencies": {
+    "mocha": "^2.0.1"
   }
 }

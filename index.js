@@ -3,6 +3,7 @@
 var fs			= require('fs'),
 	request 	= require('request'),
 	async		= require('async'),
+	cheerio		= require('cheerio'),
 	parseString	= require('xml2js').parseString;
 
 fs.exists(__dirname + '/cache', function (exists) {
@@ -147,6 +148,17 @@ function getPinIdFromUrl(pinUrl) {
 }
 
 /*
+ * Create the url for a specific pin
+ *
+ * @param String pinId
+ * @return String pinUrl
+ */
+
+function createPinUrl(pinId) {
+	return 'http://www.pinterest.com/pin/' + pinId + '/';
+}
+
+/*
  * Create a map of pin IDs to publish dates based on the object created using the XML parseString library
  *
  * @param Object xmlObject
@@ -188,7 +200,7 @@ function getPinDateMapFromBoardRssGetResponse(response, board, callback) {
 }
 
 /*
- * Get publish dates for each pin on a board (max 50)
+ * Get publish dates for each pin on a board based on RSS
  *
  * @param String board
  * @param Function callback
@@ -205,6 +217,86 @@ function getDatesForBoardPinsFromRss(username, board, callback) {
 		} else {
 			getPinDateMapFromBoardRssGetResponse(cacheData, board, callback);
 		}
+	});
+}
+
+/*
+ * Get publish dates for pins through scraping
+ *
+ * @param Array pinIds
+ * @param Function callback
+ * @invokes callback(Object pinDateMap)
+ */
+
+function getDatesForBoardPinsFromScraping(pinIds, callback) {
+	async.eachLimit(pinIds, 10, function (pinId, asyncCallback) {
+		var getOptions = {
+			'url': createPinUrl(pinId),
+			'gzip': true,
+			'headers': {
+				'Accept-Language': 'en-US,en;q=0.5',
+				'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+				// Adding the User-Agent is what fixed the weird no data on es subdomains bug
+				// Probably possible to use something else, but this worked.
+				'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0',
+			}
+		};
+
+		request.get(getOptions,
+			function(err, res, body) {
+				if (err) { throw err; }
+				var $ = cheerio.load(body);
+				var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
+				console.log(timeAgoText);
+				asyncCallback();
+
+				
+				// var isCustomerThePinner = $('a[title="Added by"][href="/' + username.toLowerCase() + '/"]').length === 1
+				// if (isCustomerThePinner) { // TODO: we should store the username in the channelAccounts table
+				// 	async.series([function(paracb) {
+				// 			executeQuery('update ' + pinterestCandidatesTable + ' set checked=1 where postUrl=' + mysqlClient.escape(item.postUrl), function() {
+				// 				paracb();
+				// 			});
+				// 		},
+				// 		function(paracb) {
+				// 			// insert into owned posts table
+				// 			var contentUrl = $('.repinLike a').attr('href');
+				// 			var message = $('.commentDescriptionContent').text();
+				// 			customerUrlUtil.getActualUrl(contentUrl, function(unshortenedUrl) {
+				// 				if (customerUrlUtil.isCustomerContentUrl(unshortenedUrl)) {
+				// 					addCustomerHashIdToDb(unshortenedUrl, accountId);
+				// 					executeQuery('insert ' + ownedContentInfoTable + ' (postUrl, contentUrl, originalContentUrl,\
+				// 				 		message, channel, date) values (' +
+				// 						mysqlClient.escape(item.postUrl) + ',' +
+				// 						mysqlClient.escape(customerUrlUtil.standardizeUrl(unshortenedUrl)) + ',' +
+				// 						mysqlClient.escape(message) + ',' +
+				// 						mysqlClient.escape(message) + ',' +
+				// 						mysqlClient.escape('PI') + ',' +
+				// 						mysqlClient.escape(item.date) + ')',
+				// 						function() {
+				// 							count++;
+				// 							paracb();
+				// 						}
+				// 					);
+				// 				} else {
+				// 					paracb();
+				// 				}
+				// 			});
+				// 		}
+				// 	], function() {
+				// 		cb();
+				// 	});
+				// } else {
+				// 	executeQuery('update ' + pinterestCandidatesTable + ' set checked=1 where postUrl=' + mysqlClient.escape(item.postUrl), function() {
+				// 		cb();
+				// 	});
+				// }
+
+			}
+		);
+	}, function (err) {
+		if (err) { throw err; }
+		callback();
 	});
 }
 
@@ -330,19 +422,24 @@ function constructor(username) {
 			}],
 			function (err) {
 				if (err) { throw err; }
+				var pinIdsThatNeedDates = [];
 				for (var i = 0; i < pins.length; i++) {
 					pins[i].created_at = '';
 					if (pinDateMap[pins[i].id]) {
 						pins[i].created_at = pinDateMap[pins[i].id];
+					} else {
+						pinIdsThatNeedDates.push(pins[i].id);
 					}
 				}
 
-				if (paginate) {
-					pins = buildResponse(pins);
-				}
+				getDatesForBoardPinsFromScraping(pinIdsThatNeedDates, function (dates) {
+					if (paginate) {
+						pins = buildResponse(pins);
+					}
 
-				callback(pins);
-				return;
+					callback(pins);
+					return;
+				});
 			}
 		);
 	}
@@ -437,3 +534,9 @@ constructor.getDataForPins = function(pinIds, callback) {
 };
 
 module.exports = constructor;
+
+var api = constructor('bobbibrown');
+api.getPinsFromBoard('empower-%2B-enhance', true, function (data) {
+	console.log(data);
+})
+console.log('wat')
