@@ -7,31 +7,31 @@ describe('reverseTimeAgo', function (){
 
 		it('should return the second before the following minute when given a minute value', function () {
 			// 2 minutes and 59 seconds in MS
-			var testTimeInMs = ((3 * 60) - 1) * 1000
+			var testTimeInMs = 3 * 60 * 1000 - 1
 			assert.equal(testTimeInMs, reverseTimeAgo.getEarliestTimeAgoInMs(2, 'minute'));
 		});
 
 		it('should return the second before the following hour when given an hour value', function () {
 			// 8 hours and 59 minutes and 59 seconds in MS
-			var testTimeInMs = (((9 * 60 * 60) - 1) * 1000);
+			var testTimeInMs = 9 * 60 * 60 * 1000 - 1;
 			assert.equal(testTimeInMs, reverseTimeAgo.getEarliestTimeAgoInMs(8, 'hour'));
 		});
 
 		it('should return the second before the following day when given a day value', function () {
 			// 4 days 23 hours 59 minuts 59 seconds in MS
-			var testTimeInMs = (((5 * 24 * 60 * 60) - 1) * 1000);
+			var testTimeInMs = 5 * 24 * 60 * 60 * 1000 - 1;
 			assert.equal(testTimeInMs, reverseTimeAgo.getEarliestTimeAgoInMs(4, 'day'));
 		});
 
 		it('should return the second before the following week when given a week value', function () {
 			// 51 weeks 6 days 23 hours 59 minutes 59 seconds in MS
-			var testTimeInMs = (((52 * 7 * 24 * 60 * 60) - 1) * 1000);
+			var testTimeInMs = 52 * 7 * 24 * 60 * 60 * 1000 - 1;
 			assert.equal(testTimeInMs, reverseTimeAgo.getEarliestTimeAgoInMs(51, 'week'));
 		});
 
 		it('should return the second before the following year when given a year value', function () {
 			// 1 years 51 weeks 6 days 23 hours 59 minutes 59 seconds in MS
-			var testTimeInMs = (((2 * 365 * 24 * 60 * 60) - 1) * 1000);
+			var testTimeInMs = 2 * 365 * 24 * 60 * 60 * 1000 - 1;
 			assert.equal(testTimeInMs, reverseTimeAgo.getEarliestTimeAgoInMs(1, 'year'));
 		});
 	});
@@ -47,10 +47,14 @@ describe('reverseTimeAgo', function (){
 
 		it('should give a date 1 second less than 44 weeks before the test date when given 43 weeks and the test date', function () {
 			var testDate = new Date(testYear, testMonth, testDay, testHour, testMinute, testSecond, testMs);
-			var testTimeInMs = (((44 * 7 * 24 * 60 * 60) - 1) * 1000);
-			var t = new Date(testYear, testMonth - 10, testDay - 5, testHour, testMinute, testSecond + 1, testMs);
-			var answerDate = new Date(testDate - testTimeInMs);
-			assert.equal(t.valueOf(), reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText('43 weeks ago', testDate).valueOf());
+			var expectedDate = new Date(testYear, testMonth - 10, testDay - 5, testHour, testMinute, testSecond, testMs + 1);
+			assert.equal(expectedDate.valueOf(), reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText('43 Weeks Ago', testDate).valueOf());
 		});
+
+		it('should give a date 59 seconds prior to the one given when given "Just Now"', function () {
+			var testDate = new Date(testYear, testMonth, testDay, testHour, testMinute, testSecond, testMs);
+			var expectedDate = new Date(testYear, testMonth, testDay, testHour, testMinute - 1, testSecond, testMs + 1);
+			assert.equal(expectedDate.valueOf(), reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText('Just Now', testDate).valueOf());
+		})
 	});
 });

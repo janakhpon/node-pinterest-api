@@ -11,7 +11,7 @@
     "url": "https://github.com/InsideInc/node-pinterest-api/issues"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha"
   },
   "keywords": [
     "pinterest",

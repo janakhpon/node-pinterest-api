@@ -246,25 +246,23 @@ function getDatesForBoardPinsFromScraping(pinIds, callback) {
 					}
 				};
 
-				request.get(getOptions,
-					function(err, res, body) {
-						if (err) { throw err; }
-						console.log(typeof body);
-						putCache(pinId + '_HTML', JSON.stringify(body));
-						var $ = cheerio.load(body);
-						var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
-						console.log(timeAgoText);
-						var earliestPossibleDate = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText);
-						pinDateMap[pinId] = earliestPossibleDate;
-						asyncCallback();
-					}
-				);
+				request.get(getOptions, function(err, res, body) {
+					if (err) { throw err; }
+					putCache(pinId + '_HTML', JSON.stringify(body));
+
+					var $ = cheerio.load(body);
+					var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
+					var earliestPossibleDate = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText);
+
+					pinDateMap[pinId] = earliestPossibleDate;
+					asyncCallback();
+				});
+
 			} else {
-				console.log('cached', typeof cacheData)
 				var $ = cheerio.load(cacheData);
 				var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
-				console.log(timeAgoText);
 				var earliestPossibleDate = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText);
+
 				pinDateMap[pinId] = earliestPossibleDate;
 				asyncCallback();
 			}
@@ -521,7 +519,3 @@ constructor.getDataForPins = function(pinIds, callback) {
 module.exports = constructor;
 
 var api = constructor('bobbibrown');
-api.getPinsFromBoard('empower-%2B-enhance', true, function (data) {
-	console.log(data);
-})
-console.log('wat')
