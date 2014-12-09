@@ -517,5 +517,3 @@ constructor.getDataForPins = function(pinIds, callback) {
 };
 
 module.exports = constructor;
-
-var api = constructor('bobbibrown');
