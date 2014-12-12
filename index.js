@@ -1,7 +1,7 @@
 'use strict';
 
 var fs				= require('fs'),
-	request			= require('request'),
+	request 		= require('request'),
 	async			= require('async'),
 	cheerio			= require('cheerio'),
 	reverseTimeAgo	= require('./lib/reverseTimeAgo'),
@@ -416,7 +416,8 @@ function constructor(username) {
 				if (err) { throw err; }
 				var pinIdsThatNeedDates = [];
 				for (var i = 0; i < pins.length; i++) {
-					pins[i].created_at = '';
+					pins[i].created_at = null;
+					allPinsData[i].created_at_source = null;
 					if (pinDateMap[pins[i].id]) {
 						pins[i].created_at = pinDateMap[pins[i].id];
 						pins[i].created_at_source = 'rss';
@@ -529,6 +530,8 @@ constructor.getDataForPins = function(pinIds, callback) {
 		}
 		getDatesForPinsFromScraping(pinIds, null, function (pinDateMap) {
 			for (var i = 0; i < allPinsData.length; i++) {
+				allPinsData[i].created_at = null;
+				allPinsData[i].created_at_source = null;
 				if (pinDateMap[allPinsData[i].id]) {
 					allPinsData[i].created_at = pinDateMap[allPinsData[i].id];
 					allPinsData[i].created_at_source = 'html';
