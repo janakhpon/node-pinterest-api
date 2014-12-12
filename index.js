@@ -1,7 +1,7 @@
 'use strict';
 
 var fs				= require('fs'),
-	request 		= require('request'),
+	request			= require('request'),
 	async			= require('async'),
 	cheerio			= require('cheerio'),
 	reverseTimeAgo	= require('./lib/reverseTimeAgo'),
@@ -225,12 +225,12 @@ function getDatesForBoardPinsFromRss(username, board, callback) {
 function parseHtmlAndGetEarliestPossibleDate(html, date) {
 	var $ = cheerio.load(html);
 	var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
-	var earliestPossibleDate;
-	try {
-		earliestPossibleDate = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText, date);
-	} catch(e) {
-		earliestPossibleDate = null;
+	var earliestPossibleDate = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText, date);
+	
+	if (earliestPossibleDate instanceof Error) {
+		return null;
 	}
+
 	return earliestPossibleDate;
 }
 
