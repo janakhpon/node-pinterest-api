@@ -26,7 +26,7 @@ var CACHE_PREFIX = 'cache/pinterest_',
  * @invoke callback(mixed response)
  */
 
-function getCache(key, callback) {
+function getCache(key, doesDateMatter, callback) {
 	key = key.replace(/\//g, '-');
 	var cacheFile = __dirname + '/' + CACHE_PREFIX + key + '.cache';
 	fs.exists(cacheFile, function (exists) {
@@ -35,7 +35,7 @@ function getCache(key, callback) {
 				if (err) {
 					throw err;
 				}
-				if (stats.mtime.valueOf() > (new Date().valueOf() - 60 * 60 * 1000)) {
+				if (!doesDateMatter || (stats.mtime.valueOf() > (new Date().valueOf() - 60 * 60 * 1000))) {
 					// The cache is less than 60 minutes old so return the contents
 					fs.readFile(cacheFile, function (err, data) {
 						if (err) {
@@ -210,7 +210,7 @@ function getPinDateMapFromBoardRssGetResponse(response, board, callback) {
  */
 
 function getDatesForBoardPinsFromRss(username, board, callback) {
-	getCache(board + '_RSS', function (cacheData) {
+	getCache(board + '_RSS', true, function (cacheData) {
 		if (cacheData === null) {
 			get('http://www.pinterest.com/' + username + '/' + board.replace(/#/g, '') + '.rss', false, function (response) {
 				putCache(board + '_RSS', JSON.stringify(response));
@@ -225,7 +225,13 @@ function getDatesForBoardPinsFromRss(username, board, callback) {
 function parseHtmlAndGetEarliestPossibleDate(html, date) {
 	var $ = cheerio.load(html);
 	var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
-	return reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText, date);
+	var earliestPossibleDate = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText, date);
+	
+	if (earliestPossibleDate instanceof Error) {
+		return null;
+	}
+
+	return earliestPossibleDate;
 }
 
 /*
@@ -236,10 +242,19 @@ function parseHtmlAndGetEarliestPossibleDate(html, date) {
  * @invokes callback(Object pinDateMap)
  */
 
-function getDatesForPinsFromScraping(pinIds, callback) {
-	var pinDateMap = {};
+function getDatesForPinsFromScraping(pinIds, pinDateMap, callback, recurseCount) {
+	pinDateMap = pinDateMap || {};
+
+	if (pinIds.length === 0 || recurseCount > 9) {
+		callback(pinDateMap);
+		return;
+	}
+
+	recurseCount = recurseCount ? recurseCount : 0;
+	var pinIdsToRetry = [];
+
 	async.eachLimit(pinIds, 10, function (pinId, asyncCallback) {
-		getCache(pinId + '_HTML', function (cacheData, dateCached) {
+		getCache(pinId + '_HTML', false, function (cacheData, dateCached) {
 			if (cacheData === null) {
 				var getOptions = {
 				'url': createPinUrl(pinId),
@@ -257,17 +272,23 @@ function getDatesForPinsFromScraping(pinIds, callback) {
 					if (err) { throw err; }
 					putCache(pinId + '_HTML', JSON.stringify(body));
 					pinDateMap[pinId] = parseHtmlAndGetEarliestPossibleDate(body);
+					if (pinDateMap[pinId] === null) {
+						pinIdsToRetry.push(pinId);
+					}
 					asyncCallback();
 				});
 
 			} else {
 				pinDateMap[pinId] = parseHtmlAndGetEarliestPossibleDate(cacheData, dateCached);
+				if (pinDateMap[pinId] === null) {
+					pinIdsToRetry.push(pinId);
+				}
 				asyncCallback();
 			}
 		});
 	}, function (err) {
 		if (err) { throw err; }
-		callback(pinDateMap);
+		getDatesForPinsFromScraping(pinIdsToRetry, pinDateMap, callback, recurseCount += 1);
 	});
 }
 
@@ -330,7 +351,7 @@ function constructor(username) {
 		var boardsResponse;
 
 		// Check for cache existence
-		getCache('boards_' + username, function (cacheData) {
+		getCache('boards_' + username, true, function (cacheData) {
 			if (cacheData === null) {
 				// Create get request and put it in the cache
 				get('http://pinterestapi.co.uk/' + username + '/boards', true, function (response) {
@@ -371,7 +392,7 @@ function constructor(username) {
 
 		async.parallel([
 			function (asyncCallback) {
-				getCache(board, function (cacheData) {
+				getCache(board, true, function (cacheData) {
 					if (cacheData === null) {
 						// Get data and put it in the cache
 						get('https://api.pinterest.com/v3/pidgets/boards/' + username + '/' + board.replace(/#/g, '') + '/pins/', true, function (response) {
@@ -395,7 +416,8 @@ function constructor(username) {
 				if (err) { throw err; }
 				var pinIdsThatNeedDates = [];
 				for (var i = 0; i < pins.length; i++) {
-					pins[i].created_at = '';
+					pins[i].created_at = null;
+					allPinsData[i].created_at_source = null;
 					if (pinDateMap[pins[i].id]) {
 						pins[i].created_at = pinDateMap[pins[i].id];
 						pins[i].created_at_source = 'rss';
@@ -404,7 +426,8 @@ function constructor(username) {
 					}
 				}
 
-				getDatesForPinsFromScraping(pinIdsThatNeedDates, function (scrapedPinDateMap) {
+				getDatesForPinsFromScraping(pinIdsThatNeedDates, null, function (scrapedPinDateMap) {
+					console.log(scrapedPinDateMap)
 					for (var i = 0; i < pins.length; i++) {
 						if (scrapedPinDateMap[pins[i].id]) {
 							pins[i].created_at = scrapedPinDateMap[pins[i].id];
@@ -488,7 +511,7 @@ constructor.getDataForPins = function(pinIds, callback) {
 
 	async.eachLimit(groupedPinIds, 50, function(groupOfPinIds, asyncCallback) {
 		var pinIdsString = groupOfPinIds.join(',');
-		getCache(pinIdsString, function (cacheData) {
+		getCache(pinIdsString, true, function (cacheData) {
 			if (cacheData === null) {
 				get('http://api.pinterest.com/v3/pidgets/pins/info/?pin_ids=' + pinIdsString, true, function (response) {
 					putCache(pinIdsString, JSON.stringify(response));
@@ -505,10 +528,22 @@ constructor.getDataForPins = function(pinIds, callback) {
 			console.error('Error iterating through groups of pin IDs');
 			throw err;
 		}
-		callback(buildResponse(allPinsData));
-		return;
+		getDatesForPinsFromScraping(pinIds, null, function (pinDateMap) {
+			for (var i = 0; i < allPinsData.length; i++) {
+				allPinsData[i].created_at = null;
+				allPinsData[i].created_at_source = null;
+				if (pinDateMap[allPinsData[i].id]) {
+					allPinsData[i].created_at = pinDateMap[allPinsData[i].id];
+					allPinsData[i].created_at_source = 'html';
+				}
+			}
+			callback(buildResponse(allPinsData));
+			return;
+		});
 	});
 
 };
+
+constructor.getEarliestPossibleDateFromTimeAgoText = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText;
 
 module.exports = constructor;

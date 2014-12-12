@@ -55,6 +55,10 @@ describe('reverseTimeAgo', function (){
 			var testDate = new Date(testYear, testMonth, testDay, testHour, testMinute, testSecond, testMs);
 			var expectedDate = new Date(testYear, testMonth, testDay, testHour, testMinute - 1, testSecond, testMs + 1);
 			assert.equal(expectedDate.valueOf(), reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText('Just Now', testDate).valueOf());
-		})
+		});
+
+		it('should return an error if you pass empty string', function () {
+			assert.equal(true, reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText('') instanceof Error);
+		});
 	});
 });

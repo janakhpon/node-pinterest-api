@@ -1,6 +1,6 @@
 {
   "name": "pinterest-api",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Node wrapper for the unofficial Pinterest API",
   "main": "index.js",
   "repository": {
