@@ -292,6 +292,10 @@ function getDatesForPinsFromScraping(pinIds, pinDateMap, callback, recurseCount)
 	});
 }
 
+// public
+
+var getDates = true;
+
 /*
  * Constructor function
  *
@@ -299,8 +303,6 @@ function getDatesForPinsFromScraping(pinIds, pinDateMap, callback, recurseCount)
  */
 
 function constructor(username) {
-	// public members
-
 	/*
 	 * Set itemsPerPage variable
 	 *
@@ -426,20 +428,29 @@ function constructor(username) {
 					}
 				}
 
-				getDatesForPinsFromScraping(pinIdsThatNeedDates, null, function (scrapedPinDateMap) {
-					for (var i = 0; i < pins.length; i++) {
-						if (scrapedPinDateMap[pins[i].id]) {
-							pins[i].created_at = scrapedPinDateMap[pins[i].id];
-							pins[i].created_at_source = 'html';
+				if (getDates) {
+					getDatesForPinsFromScraping(pinIdsThatNeedDates, null, function (scrapedPinDateMap) {
+						for (var i = 0; i < pins.length; i++) {
+							if (scrapedPinDateMap[pins[i].id]) {
+								pins[i].created_at = scrapedPinDateMap[pins[i].id];
+								pins[i].created_at_source = 'html';
+							}
 						}
-					}
+						if (paginate) {
+							pins = buildResponse(pins);
+						}
+
+						callback(pins);
+						return;
+					});
+				} else {
 					if (paginate) {
 						pins = buildResponse(pins);
 					}
 
 					callback(pins);
 					return;
-				});
+				}
 			}
 		);
 	}
@@ -484,7 +495,8 @@ function constructor(username) {
 		getCurrentPage: getCurrentPage,
 		setCurrentPage: setCurrentPage,
 		getItemsPerPage: getItemsPerPage,
-		setItemsPerPage: setItemsPerPage
+		setItemsPerPage: setItemsPerPage,
+		getDates: getDates;
 	};
 }
 
@@ -527,18 +539,24 @@ constructor.getDataForPins = function(pinIds, callback) {
 			console.error('Error iterating through groups of pin IDs');
 			throw err;
 		}
-		getDatesForPinsFromScraping(pinIds, null, function (pinDateMap) {
-			for (var i = 0; i < allPinsData.length; i++) {
-				allPinsData[i].created_at = null;
-				allPinsData[i].created_at_source = null;
-				if (pinDateMap[allPinsData[i].id]) {
-					allPinsData[i].created_at = pinDateMap[allPinsData[i].id];
-					allPinsData[i].created_at_source = 'html';
+		if (getDates) {
+			getDatesForPinsFromScraping(pinIds, null, function (pinDateMap) {
+				for (var i = 0; i < allPinsData.length; i++) {
+					allPinsData[i].created_at = null;
+					allPinsData[i].created_at_source = null;
+					if (pinDateMap[allPinsData[i].id]) {
+						allPinsData[i].created_at = pinDateMap[allPinsData[i].id];
+						allPinsData[i].created_at_source = 'html';
+					}
 				}
-			}
+				callback(buildResponse(allPinsData));
+				return;
+			});
+		} else {
 			callback(buildResponse(allPinsData));
 			return;
-		});
+		}
+		
 	});
 
 };

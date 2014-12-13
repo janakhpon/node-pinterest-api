@@ -119,3 +119,9 @@ that pinterest shows on the page (i.e. 3 weeks ago). We took the conservative ap
 example, our date would be 1 second before 4 weeks prior to the current date (the date of the app running) because Pinterest always rounds down when between dates 
 (i.e. if actual date was 3.8 weeks ago, it'd say 3 weeks ago rather than 4 weeks ago). As the accuracy of the date may be important, a 'created_at_source' property on the pin object to 
 show whether the source was rss or html.
+
+Note that having to scrape for many pins may take some time, so if you don't care about having the date returned with each pin object, you can turn dates off:
+
+```
+pinterest.getDates = false;
+```
