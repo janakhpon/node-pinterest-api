@@ -122,6 +122,12 @@ show whether the source was rss or html.
 
 Note that having to scrape for many pins may take some time, so if you don't care about having the date returned with each pin object, you can turn dates off:
 
+```javascript
+pinterest.setObtainDates(false);
 ```
-pinterest.getDates = false;
+
+You can see the current state of obtainDates with:
+
+```javascript
+pinterest.getObtainDates();
 ```

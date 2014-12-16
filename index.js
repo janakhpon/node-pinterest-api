@@ -16,6 +16,7 @@ fs.exists(__dirname + '/cache', function (exists) {
 // private members
 var CACHE_PREFIX = 'cache/pinterest_',
 	itemsPerPage = null, // all results on 1 page by default
+	obtainDates = true,
 	currentPage = 1;
 
 /* 
@@ -294,8 +295,6 @@ function getDatesForPinsFromScraping(pinIds, pinDateMap, callback, recurseCount)
 
 // public
 
-var getDates = true;
-
 /*
  * Constructor function
  *
@@ -389,8 +388,8 @@ function constructor(username) {
      */
 
 	function getPinsFromBoard(board, paginate, callback) {
-		var pins;
-		var pinDateMap;
+		var pins = [];
+		var pinDateMap = {};
 
 		async.parallel([
 			function (asyncCallback) {
@@ -409,9 +408,15 @@ function constructor(username) {
 				});
 			},
 			function (asyncCallback) {
+				if (!obtainDates) {
+					asyncCallback();
+					return;
+				}
+
 				getDatesForBoardPinsFromRss(username, board, function (dates) {
 					pinDateMap = dates;
 					asyncCallback();
+					return;
 				});
 			}],
 			function (err) {
@@ -428,7 +433,7 @@ function constructor(username) {
 					}
 				}
 
-				if (getDates) {
+				if (obtainDates) {
 					getDatesForPinsFromScraping(pinIdsThatNeedDates, null, function (scrapedPinDateMap) {
 						for (var i = 0; i < pins.length; i++) {
 							if (scrapedPinDateMap[pins[i].id]) {
@@ -488,6 +493,25 @@ function constructor(username) {
 		});
 	}
 
+	/*
+	 * Get obtainDates variable
+	 *
+	 */
+
+	function getObtainDates() {
+		return obtainDates;
+	}
+
+	/*
+	 * Set obtainDates variable
+	 *
+	 * @param boolean bool
+	 */
+
+	function setObtainDates(bool) {
+		obtainDates = bool;
+	}
+
 	return {
 		getPins: getPins,
 		getBoards: getBoards,
@@ -496,7 +520,8 @@ function constructor(username) {
 		setCurrentPage: setCurrentPage,
 		getItemsPerPage: getItemsPerPage,
 		setItemsPerPage: setItemsPerPage,
-		getDates: getDates
+		getObtainDates: getObtainDates,
+		setObtainDates: setObtainDates
 	};
 }
 
@@ -539,7 +564,7 @@ constructor.getDataForPins = function(pinIds, callback) {
 			console.error('Error iterating through groups of pin IDs');
 			throw err;
 		}
-		if (getDates) {
+		if (obtainDates) {
 			getDatesForPinsFromScraping(pinIds, null, function (pinDateMap) {
 				for (var i = 0; i < allPinsData.length; i++) {
 					allPinsData[i].created_at = null;
