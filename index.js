@@ -496,7 +496,7 @@ function constructor(username) {
 		setCurrentPage: setCurrentPage,
 		getItemsPerPage: getItemsPerPage,
 		setItemsPerPage: setItemsPerPage,
-		getDates: getDates;
+		getDates: getDates
 	};
 }
 
