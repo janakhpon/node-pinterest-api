@@ -104,12 +104,13 @@ function get(url, shouldParse, callback) {
 	request(url, function (err, response, body) {
 		if (err) {
 			console.error('Error making GET request to endpoint ' + url);
-			throw err;
+      callback(shouldParse ? {} : "{}");
 		}
 
 		if (response.statusCode !== 200) {
-			console.error(response);
-			throw new Error('Did not receive a 200 response when making GET request to endpoint ' + url);
+      console.error('non 200 response for URL: ' + url);
+      callback(shouldParse ? {} : "{}");
+      return;
 		}
 
 		var toReturn = shouldParse ? JSON.parse(body) : body;
@@ -169,14 +170,21 @@ function createPinUrl(pinId) {
  */
 
 function createPinDateMapFromRssXmlObject(xmlObject) {
-	var pinDateMap = {};
-	var pins = xmlObject.rss.channel[0].item;
-	for (var i = 0; i < pins.length; i++) {
-		var publishDate = new Date(pins[i].pubDate[0]);
-		var pinId = getPinIdFromUrl(pins[i].guid[0]);
-		pinDateMap[pinId] = publishDate;
-	}
-	return pinDateMap;
+  var pinDateMap;
+
+  try {
+    pinDateMap = {};
+    var pins = xmlObject.rss.channel[0].item;
+    for (var i = 0; i < pins.length; i++) {
+      var publishDate = new Date(pins[i].pubDate[0]);
+      var pinId = getPinIdFromUrl(pins[i].guid[0]);
+      pinDateMap[pinId] = publishDate;
+    }
+  } catch (e) {
+    pinDateMap = {};
+  }
+
+  return pinDateMap;
 }
 
 /*
@@ -270,7 +278,14 @@ function getDatesForPinsFromScraping(pinIds, pinDateMap, callback, recurseCount)
 				};
 
 				request.get(getOptions, function(err, res, body) {
-					if (err) { throw err; }
+					if (err) {
+            console.error('error getting ' + getOptions.url);
+            console.error(err);
+            pinIdsToRetry.push(pinId);
+            asyncCallback();
+            return;
+          }
+
 					putCache(pinId + '_HTML', JSON.stringify(body));
 					pinDateMap[pinId] = parseHtmlAndGetEarliestPossibleDate(body);
 					if (pinDateMap[pinId] === null) {
@@ -357,20 +372,20 @@ function constructor(username) {
 				// Create get request and put it in the cache
 				get('http://pinterestapi.co.uk/' + username + '/boards', true, function (response) {
 					putCache('boards_' + username, JSON.stringify(response));
-					boardsResponse = buildResponse(response.body);
+
 					if (paginate) {
-						boardsResponse = buildResponse(response.body);
+						boardsResponse = buildResponse(response.body ? response.body : []);
 					} else {
-						boardsResponse = response.body;
+						boardsResponse = response.body ? response.body : [];
 					}
 					callback(boardsResponse);
 					return;
 				});
 			} else {
 				if (paginate) {
-					boardsResponse = buildResponse(cacheData.body);
+					boardsResponse = buildResponse(cacheData.body ? cacheData.body : []);
 				} else {
-					boardsResponse = cacheData.body;
+					boardsResponse = cacheData.body ? cacheData.body : [];
 				}
 				callback(boardsResponse);
 				return;
@@ -398,11 +413,11 @@ function constructor(username) {
 						// Get data and put it in the cache
 						get('https://api.pinterest.com/v3/pidgets/boards/' + username + '/' + board.replace(/#/g, '') + '/pins/', true, function (response) {
 							putCache(board, JSON.stringify(response));
-							pins = response.data.pins;
+							pins = response.data ? response.data.pins : [];
 							asyncCallback();
 						});
 					} else {
-						pins = cacheData.data.pins;
+						pins = cacheData.data ? cacheData.data.pins : [];
 						asyncCallback();
 					}
 				});
@@ -551,11 +566,11 @@ constructor.getDataForPins = function(pinIds, callback) {
 			if (cacheData === null) {
 				get('http://api.pinterest.com/v3/pidgets/pins/info/?pin_ids=' + pinIdsString, true, function (response) {
 					putCache(pinIdsString, JSON.stringify(response));
-					allPinsData = allPinsData.concat(response.data);
+					allPinsData = allPinsData.concat(response.data ? response.data : []);
 					asyncCallback();
 				});
 			} else {
-				allPinsData = allPinsData.concat(cacheData.data);
+				allPinsData = allPinsData.concat(cacheData.data ? cacheData.data : []);
 				asyncCallback();
 			}
 		});
