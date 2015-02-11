@@ -170,21 +170,21 @@ function createPinUrl(pinId) {
  */
 
 function createPinDateMapFromRssXmlObject(xmlObject) {
-  var pinDateMap;
+    var pinDateMap;
 
-  try {
-    pinDateMap = {};
-    var pins = xmlObject.rss.channel[0].item;
-    for (var i = 0; i < pins.length; i++) {
-      var publishDate = new Date(pins[i].pubDate[0]);
-      var pinId = getPinIdFromUrl(pins[i].guid[0]);
-      pinDateMap[pinId] = publishDate;
+    try {
+        pinDateMap = {};
+        var pins = xmlObject.rss.channel[0].item;
+        for (var i = 0; i < pins.length; i++) {
+            var publishDate = new Date(pins[i].pubDate[0]);
+            var pinId = getPinIdFromUrl(pins[i].guid[0]);
+            pinDateMap[pinId] = publishDate;
+        }
+    } catch (e) {
+        pinDateMap = {};
     }
-  } catch (e) {
-    pinDateMap = {};
-  }
 
-  return pinDateMap;
+    return pinDateMap;
 }
 
 /*
@@ -279,12 +279,12 @@ function getDatesForPinsFromScraping(pinIds, pinDateMap, callback, recurseCount)
 
                 request.get(getOptions, function(err, res, body) {
                     if (err) {
-            console.error('error getting ' + getOptions.url);
-            console.error(err);
-            pinIdsToRetry.push(pinId);
-            asyncCallback();
-            return;
-          }
+                        console.error('error getting ' + getOptions.url);
+                        console.error(err);
+                        pinIdsToRetry.push(pinId);
+                        asyncCallback();
+                        return;
+                    }
 
                     putCache(pinId + '_HTML', JSON.stringify(body));
                     pinDateMap[pinId] = parseHtmlAndGetEarliestPossibleDate(body);
