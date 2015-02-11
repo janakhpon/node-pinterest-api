@@ -1,11 +1,11 @@
 'use strict';
 
-var fs                = require('fs'),
-    request            = require('request'),
-    async            = require('async'),
-    cheerio            = require('cheerio'),
-    reverseTimeAgo    = require('./lib/reverseTimeAgo'),
-    parseString        = require('xml2js').parseString;
+var fs = require('fs'),
+    request = require('request'),
+    async = require('async'),
+    cheerio = require('cheerio'),
+    reverseTimeAgo = require('./lib/reverseTimeAgo'),
+    parseString = require('xml2js').parseString;
 
 fs.exists(__dirname + '/cache', function (exists) {
     if (!exists) {
@@ -108,9 +108,9 @@ function get(url, shouldParse, callback) {
         }
 
         if (response.statusCode !== 200) {
-      console.error('non 200 response for URL: ' + url);
-      callback(shouldParse ? {} : "{}");
-      return;
+            console.error('non 200 response for URL: ' + url);
+            callback(shouldParse ? {} : "{}");
+            return;
         }
 
         var toReturn = shouldParse ? JSON.parse(body) : body;
