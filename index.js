@@ -645,7 +645,7 @@ constructor.getDataForPins = function(pinIds, callback) {
                     for (var i = 0; i < allPinsData.length; i++) {
                         allPinsData[i].created_at = null;
                         allPinsData[i].created_at_source = null;
-                        if (pinDateMap[allPinsData[i].id] && false) {
+                        if (pinDateMap[allPinsData[i].id]) {
                             allPinsData[i].created_at = pinDateMap[allPinsData[i].id];
                             allPinsData[i].created_at_source = 'rss';
                         } else {
