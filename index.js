@@ -13,6 +13,17 @@ fs.exists(__dirname + '/cache', function (exists) {
     }
 });
 
+function mergeMaps(maps) {
+    var result = {};
+    for (var i = 0; i < maps.length; i++) {
+        var keys = Object.keys(maps[i]);
+        for(var j = 0; j < keys.length; j++) {
+            result[keys[j]] = maps[i][keys[j]];
+        }
+    }
+    return result;
+}
+
 // private members
 var CACHE_PREFIX = 'cache/pinterest_',
     itemsPerPage = null, // all results on 1 page by default
@@ -553,6 +564,8 @@ function constructor(username) {
 constructor.getDataForPins = function(pinIds, callback) {
     var allPinsData = [];
     var groupedPinIds = [];
+    var boards = [];
+    var pinsThatNeedScrapedDates = [];
     var APIMaxPinsAllowedPerRequest = 10;
 
     for (var i = 0; i < pinIds.length; i += APIMaxPinsAllowedPerRequest) {
@@ -560,45 +573,117 @@ constructor.getDataForPins = function(pinIds, callback) {
         groupedPinIds.push(pinIdGroup);
     }
 
-    async.eachLimit(groupedPinIds, 50, function(groupOfPinIds, asyncCallback) {
-        var pinIdsString = groupOfPinIds.join(',');
-        getCache(pinIdsString, true, function (cacheData) {
-            if (cacheData === null) {
-                get('http://api.pinterest.com/v3/pidgets/pins/info/?pin_ids=' + pinIdsString, true, function (response) {
-                    putCache(pinIdsString, JSON.stringify(response));
-                    allPinsData = allPinsData.concat(response.data ? response.data : []);
-                    asyncCallback();
-                });
-            } else {
-                allPinsData = allPinsData.concat(cacheData.data ? cacheData.data : []);
-                asyncCallback();
-            }
-        });
-    }, function (err) {
-        if (err) {
-            console.error('Error iterating through groups of pin IDs');
-            throw err;
-        }
-        if (obtainDates) {
-            getDatesForPinsFromScraping(pinIds, null, function (pinDateMap) {
-                for (var i = 0; i < allPinsData.length; i++) {
-                    allPinsData[i].created_at = null;
-                    allPinsData[i].created_at_source = null;
-                    if (pinDateMap[allPinsData[i].id]) {
-                        allPinsData[i].created_at = pinDateMap[allPinsData[i].id];
-                        allPinsData[i].created_at_source = 'html';
+    async.series(
+        [
+            // get pin data from API
+            function(seriesCallback) {
+                async.eachLimit(groupedPinIds, 50, function(groupOfPinIds, eachCallback) {
+                    var pinIdsString = groupOfPinIds.join(',');
+                    getCache(pinIdsString, true, function (cacheData) {
+                        if (cacheData === null) {
+                            get('http://api.pinterest.com/v3/pidgets/pins/info/?pin_ids=' + pinIdsString, true, function (response) {
+                                putCache(pinIdsString, JSON.stringify(response));
+                                allPinsData = allPinsData.concat(response.data ? response.data : []);
+                                eachCallback();
+                                return;
+                            });
+                        } else {
+                            allPinsData = allPinsData.concat(cacheData.data ? cacheData.data : []);
+                            eachCallback();
+                            return;
+                        }
+                    });
+                }, function (err) {
+                    if(err) {
+                        throw err;
+                    }
+                    seriesCallback();
+                    return;
+                });             
+            },
+            // create list of boards that the pins belong to
+            function(seriesCallback) {
+                var userBoardAlreadyAdded = {};
+
+                for(var i = 0; i < allPinsData.length; i++) {
+                    var pin = allPinsData[i];
+                    if(pin.board) {
+                        var boardUrlParts = pin.board.url.split('/');
+                        var user = boardUrlParts[1];
+                        var board = boardUrlParts[2];
+
+                        if(!userBoardAlreadyAdded[user + board]) {
+                            userBoardAlreadyAdded[user + board] = true;
+                            boards.push({user: user, board: board});
+                        }
                     }
                 }
-                callback(buildResponse(allPinsData));
+
+                seriesCallback();
                 return;
-            });
-        } else {
+            },
+            // get what dates we can for pins from the board RSS feeds
+            function(seriesCallback) {
+                if(!obtainDates) {
+                    seriesCallback();
+                    return;
+                }
+
+                var pinDateMaps = [];
+                async.eachLimit(boards, 5, function(board, eachCallback) {
+                    getDatesForBoardPinsFromRss(board.user, board.board, function(result) {
+                        pinDateMaps.push(result);
+                        eachCallback();
+                    });
+                }, function (err) {
+                    if(err) {
+                        throw err;
+                    }
+
+                    var pinDateMap = mergeMaps(pinDateMaps);
+
+                    for (var i = 0; i < allPinsData.length; i++) {
+                        allPinsData[i].created_at = null;
+                        allPinsData[i].created_at_source = null;
+                        if (pinDateMap[allPinsData[i].id]) {
+                            allPinsData[i].created_at = pinDateMap[allPinsData[i].id];
+                            allPinsData[i].created_at_source = 'rss';
+                        } else {
+                            pinsThatNeedScrapedDates.push(allPinsData[i].id);
+                        }
+                    }
+
+                    seriesCallback();
+                    return;
+                });
+            },
+            // get remaining dates by scraping
+            function(seriesCallback) {
+                if(!obtainDates) {
+                    seriesCallback();
+                    return;
+                }
+
+                getDatesForPinsFromScraping(pinsThatNeedScrapedDates, null, function (pinDateMap) {
+                    for (var i = 0; i < allPinsData.length; i++) {
+                        if (allPinsData[i].created_at == null && pinDateMap[allPinsData[i].id]) {
+                            allPinsData[i].created_at = pinDateMap[allPinsData[i].id];
+                            allPinsData[i].created_at_source = 'html';
+                        }
+                    }
+                    seriesCallback();
+                    return;
+                });
+            }
+        ],
+        function(err) {
+            if (err) {
+                throw err;
+            }
             callback(buildResponse(allPinsData));
             return;
         }
-        
-    });
-
+    );
 };
 
 constructor.getEarliestPossibleDateFromTimeAgoText = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText;
