@@ -242,9 +242,51 @@ function getDatesForBoardPinsFromRss(username, board, callback) {
     });
 }
 
+function getPinDateFromScriptTag(html, pinId) {
+    /*
+     The date is present in a JSON object that is passed to a method in a script tag that looks like this:
+
+     <script id="jsInit">
+         P.scout.init({ ... a big JSON blob ... });
+         P.start.start({"gaAccountNumbers": ["UA-12967896-7"], "trustedHostnameEnding": "pinterest.com",
+            ...
+            "tree": {
+                ...
+                "data": {
+                    ...
+                    "id": 12345,
+                    ...
+                    "created_at": "Thu, 26 Mar 2015 17:47:01 +0000"
+                    ...
+                }
+            ...
+            "canDebug": false
+        });
+    </script>
+    */
+
+    try {
+        var date = null;
+        var $ = cheerio.load(html);
+        var scriptText = $('#jsInit').eq(0).text();
+        scriptText = scriptText.substring(scriptText.indexOf('P.start.start(') + 14, scriptText.lastIndexOf(';') - 1);
+        var scriptObject = JSON.parse(scriptText);
+
+        if(scriptObject.tree.data.created_at && scriptObject.tree.data.id == pinId) {
+            date = new Date(scriptObject.tree.data.created_at);
+        }
+
+        return date;
+
+    } catch(e) {
+        return null;
+    }
+}
+
 function parseHtmlAndGetEarliestPossibleDate(html, date) {
     var $ = cheerio.load(html);
-    var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text().trim().slice(2);
+    var timeAgoText = $('.commentDescriptionTimeAgo').eq(0).text();
+    timeAgoText = timeAgoText.replace('&bull;', '').trim();
     var earliestPossibleDate = reverseTimeAgo.getEarliestPossibleDateFromTimeAgoText(timeAgoText, date);
     
     if (earliestPossibleDate instanceof Error) {
@@ -275,6 +317,9 @@ function getDatesForPinsFromScraping(pinIds, pinDateMap, callback, recurseCount)
 
     async.eachLimit(pinIds, 10, function (pinId, asyncCallback) {
         getCache(pinId + '_HTML', false, function (cacheData, dateCached) {
+
+            pinDateMap[pinId] = {};
+
             if (cacheData === null) {
                 var getOptions = {
                 'url': createPinUrl(pinId),
@@ -298,18 +343,38 @@ function getDatesForPinsFromScraping(pinIds, pinDateMap, callback, recurseCount)
                     }
 
                     putCache(pinId + '_HTML', JSON.stringify(body));
-                    pinDateMap[pinId] = parseHtmlAndGetEarliestPossibleDate(body);
-                    if (pinDateMap[pinId] === null) {
+
+                    pinDateMap[pinId].date = getPinDateFromScriptTag(body, pinId);
+                    pinDateMap[pinId].source = 'rss';
+                    // TODO: We now sort of have a third source of dates, but changing the created_at_source values or adding a new one could break existing clients
+                    // For now, set it as 'rss' since it still communicates the important info that the date retrieved is known to be accurate
+                    // Later, we could maybe change the possible created_at_source values and announce the breaking change in documentation
+
+                    if(!pinDateMap[pinId].date) {
+                        pinDateMap[pinId].date = parseHtmlAndGetEarliestPossibleDate(body);
+                        pinDateMap[pinId].source = 'html';
+                    }
+
+                    if (pinDateMap[pinId].date === null) {
                         pinIdsToRetry.push(pinId);
                     }
                     asyncCallback();
                 });
 
             } else {
-                pinDateMap[pinId] = parseHtmlAndGetEarliestPossibleDate(cacheData, dateCached);
-                if (pinDateMap[pinId] === null) {
+
+                pinDateMap[pinId].date = getPinDateFromScriptTag(cacheData, pinId);
+                pinDateMap[pinId].source = 'rss';
+
+                if(!pinDateMap[pinId].date) {
+                    pinDateMap[pinId].date = parseHtmlAndGetEarliestPossibleDate(cacheData);
+                    pinDateMap[pinId].source = 'html';
+                }
+
+                if (pinDateMap[pinId].date === null) {
                     pinIdsToRetry.push(pinId);
                 }
+
                 asyncCallback();
             }
         });
@@ -462,9 +527,9 @@ function constructor(username) {
                 if (obtainDates) {
                     getDatesForPinsFromScraping(pinIdsThatNeedDates, null, function (scrapedPinDateMap) {
                         for (var i = 0; i < pins.length; i++) {
-                            if (scrapedPinDateMap[pins[i].id]) {
-                                pins[i].created_at = scrapedPinDateMap[pins[i].id];
-                                pins[i].created_at_source = 'html';
+                            if (scrapedPinDateMap[pins[i].id] && scrapedPinDateMap[pins[i].id].date) {
+                                pins[i].created_at = scrapedPinDateMap[pins[i].id].date;
+                                pins[i].created_at_source = scrapedPinDateMap[pins[i].id].source;
                             }
                         }
                         if (paginate) {
@@ -666,9 +731,9 @@ constructor.getDataForPins = function(pinIds, callback) {
 
                 getDatesForPinsFromScraping(pinsThatNeedScrapedDates, null, function (pinDateMap) {
                     for (var i = 0; i < allPinsData.length; i++) {
-                        if (allPinsData[i].created_at == null && pinDateMap[allPinsData[i].id]) {
-                            allPinsData[i].created_at = pinDateMap[allPinsData[i].id];
-                            allPinsData[i].created_at_source = 'html';
+                        if (allPinsData[i].created_at == null && pinDateMap[allPinsData[i].id] && pinDateMap[allPinsData[i].id].date) {
+                            allPinsData[i].created_at = pinDateMap[allPinsData[i].id].date;
+                            allPinsData[i].created_at_source = pinDateMap[allPinsData[i].id].source;
                         }
                     }
                     seriesCallback();
