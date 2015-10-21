@@ -247,20 +247,21 @@ function getPinDateFromScriptTag(html, pinId) {
      The date is present in a JSON object that is passed to a method in a script tag that looks like this:
 
      <script id="jsInit">
-         P.scout.init({ ... a big JSON blob ... });
-         P.start.start({"gaAccountNumbers": ["UA-12967896-7"], "trustedHostnameEnding": "pinterest.com",
-            ...
-            "tree": {
+        Pw.loadEverything(Pc.locale, function() {
+            P.main.start({"copytune": {"Create a business account": {"copytune:ptnr_copytune_ecommerce": ...
                 ...
-                "data": {
+                "tree": {
                     ...
-                    "id": 12345,
-                    ...
-                    "created_at": "Thu, 26 Mar 2015 17:47:01 +0000"
-                    ...
-                }
-            ...
-            "canDebug": false
+                    "data": {
+                        ...
+                        "id": 12345,
+                        ...
+                        "created_at": "Thu, 26 Mar 2015 17:47:01 +0000"
+                        ...
+                    }
+                ...
+                "canDebug": false
+            });
         });
     </script>
     */
@@ -269,7 +270,8 @@ function getPinDateFromScriptTag(html, pinId) {
         var date = null;
         var $ = cheerio.load(html);
         var scriptText = $('#jsInit').eq(0).text();
-        scriptText = scriptText.substring(scriptText.indexOf('P.start.start(') + 14, scriptText.lastIndexOf(';') - 1);
+        scriptText = scriptText.substring(scriptText.indexOf('P.main.start(') + 13, scriptText.lastIndexOf(';'));
+        scriptText = scriptText.substring(0, scriptText.lastIndexOf(';') - 1);
         var scriptObject = JSON.parse(scriptText);
 
         if(scriptObject.tree.data.created_at && scriptObject.tree.data.id == pinId) {
