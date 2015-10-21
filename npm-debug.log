@@ -1,0 +1,99 @@
+0 info it worked if it ends with ok
+1 verbose cli [ '/usr/local/bin/node', '/usr/local/bin/npm', 'publish' ]
+2 info using npm@2.7.4
+3 info using node@v0.12.2
+4 verbose node symlink /usr/local/bin/node
+5 verbose publish [ '.' ]
+6 silly cache add args [ '.', null ]
+7 verbose cache add spec .
+8 silly cache add parsed spec { raw: '.',
+8 silly cache add   scope: null,
+8 silly cache add   name: null,
+8 silly cache add   rawSpec: '.',
+8 silly cache add   spec: '/Users/andy/node-pinterest-api',
+8 silly cache add   type: 'directory' }
+9 verbose addLocalDirectory /Users/andy/.npm/pinterest-api/1.1.3/package.tgz not in flight; packing
+10 verbose tar pack [ '/Users/andy/.npm/pinterest-api/1.1.3/package.tgz',
+10 verbose tar pack   '/Users/andy/node-pinterest-api' ]
+11 verbose tarball /Users/andy/.npm/pinterest-api/1.1.3/package.tgz
+12 verbose folder /Users/andy/node-pinterest-api
+13 info prepublish pinterest-api@1.1.3
+14 verbose addLocalTarball adding from inside cache /Users/andy/.npm/pinterest-api/1.1.3/package.tgz
+15 silly cache afterAdd pinterest-api@1.1.3
+16 verbose afterAdd /Users/andy/.npm/pinterest-api/1.1.3/package/package.json not in flight; writing
+17 verbose afterAdd /Users/andy/.npm/pinterest-api/1.1.3/package/package.json written
+18 silly publish { name: 'pinterest-api',
+18 silly publish   version: '1.1.3',
+18 silly publish   description: 'Node wrapper for the unofficial Pinterest API',
+18 silly publish   main: 'index.js',
+18 silly publish   repository:
+18 silly publish    { type: 'git',
+18 silly publish      url: 'https://github.com/InsideInc/node-pinterest-api' },
+18 silly publish   bugs: { url: 'https://github.com/InsideInc/node-pinterest-api/issues' },
+18 silly publish   scripts: { test: 'mocha' },
+18 silly publish   keywords: [ 'pinterest', 'api' ],
+18 silly publish   author: { name: 'Inside Social' },
+18 silly publish   license: 'MIT',
+18 silly publish   dependencies:
+18 silly publish    { async: '^0.9.0',
+18 silly publish      cheerio: '^0.18.0',
+18 silly publish      request: '^2.48.0',
+18 silly publish      xml2js: '^0.4.4' },
+18 silly publish   engines: { node: '0.10.21' },
+18 silly publish   devDependencies: { mocha: '^2.0.1' },
+18 silly publish   readme: 'pinterest-api\n==================\n\nnode client for the unofficial API to get pins and boards from a Pinterest user. Note that due to limitations in the unofficial API, this app will retrieve at most 50 pins per board.\n\nThanks to github user TakeTwoMerkidentiteit for making his/her PHP client for the unofficial Pinterest API, from which I roughly ported most of the methods (https://github.com/TakeTwoMerkidentiteit/Pinterest-API)\n\nTo install:\n```\nnpm install pinterest-api\n```\n\nMethods\n=================\n```javascript\n// import\nvar pinterestAPI = require(\'pinterest-api\');\n\n// Create a new object and set the accountname\nvar pinterest = pinterestAPI(accountName);\n\n// Get pins from a board (second parameter determines whether you want the results paginated and to include some metadata)\npinterest.getPinsFromBoard(boardName, true, function (pins) {\n\t...\n});\n\n// Get all pins\npinterest.getPins(function (pins) {\n\t...\n});\n\n// Get all boards (first parameter determines whether you want the results pagined and to include some metadata)\npinterest.getBoards(true, function (boards) {\n\t...\n});\n\n// Get data for pins (note that this is a static method (a method of the class itself) since it does not rely on any state)\npinterestAPI.getDataForPins(arrayOfPinIds, function (data) {\n    ...\n});\n```\n\nThe API returns all data with meta data. The results are \'paginated\' but the default data per page is all the data. This is because given the 50 pin max per board limitation \nmentioned above, I don\'t think actual pagination will really be needed. However, the setting can be changed easily:\n\n```javascript\npinterest.setItemsPerPage(50); // Set itemsPerPage to 50 (default is fitting all items on the first page, set this to null for if you change this and want to get back to default behavior)\n```\n\nIf you need to change pages:\n```javascript\npinterest.setCurrentPage(2); // Set current page to 2\n```\n\nIf you want to get the itemsPerPage and currentPage settings:\n```javascript\npinterest.getItemsPerPage();\npinterest.getCurrentPage();\n```\n\nCache\n=================\nThere is a very simple file caching system in place. The script will try to create the ./cache if it doesn\'t exist directory so be sure that your permissions have been set right.\n\nReturned Data\n=================\nThe API returns an object. Below is an example (remember that items_per_page is null by default, and just means all data will be on first page).\n\nNote that the unofficial Pinterest API does not return dates, so we use the boards RSS feeds to get as many dates as possible and add them to the data objects.\nIf the date fields are empty strings, it just means we could not get them. Currently working on internally scraping pin pages to get dates from the HTML.\n\n```\n{\n    total_items: 500,\n    items_per_page: null,\n    total_pages: 1,\n    current_page: 1,\n    data: [\n        {\n            attribution: null,\n            description: "10 Misverstanden over Het Nieuwe Werken - News - Het Nieuwe Werken",\n            pinner: {\n                about: "Wij zijn een full-service bureau voor interieurprojecten. Wij ontwerpen, realiseren managen turn-key creatieve en duurzame interieurs.",\n                location: "Utrecht",\n                full_name: "Rever Interieurprojecten",\n                follower_count: 48,\n                image_small_url: "http://media-cache-ec0.pinimg.com/avatars/reverinspiratie_1393949212_30.jpg",\n                pin_count: 525,\n                id: "506444058005094518",\n                profile_url: "http://www.pinterest.com/reverinterieur/"\n            },\n            repin_count: 0,\n            dominant_color: "#eff7ee",\n            like_count: 0,\n            link: "https://cbreprojects.nl/hetnieuwewerken/news/detail/spread-propertynl/",\n            images: {\n                237x: {\n                    url: "http://media-cache-ec0.pinimg.com/237x/1e/5d/e7/1e5de7f618686727bd373f8b032280bd.jpg",\n                    width: 237,\n                    height: 101\n                }\n            },\n            embed: null,\n            is_video: false,\n            id: "506443920570421590",\n            created_at: Tue Feb 12 2013 09:44:33 GMT-0800 (PST),\n            created_at_source: \'rss\'\n        },\n        [...]\n    ]\n}\n```\n\nMisc\n=================\nThe JSON for each pin that pinterest gives us does not include the date that the pin was created. Therefore, we use a combination of RSS feeds and scraping to get the dates of the pins.\nHowever, the accuracy of all dates are not equivalent. The dates obtained from the RSS feeds are accurate, but the dates from scraping have to be inferred based on the \'time ago\' text \nthat pinterest shows on the page (i.e. 3 weeks ago). We took the conservative approach of assigning the earliest possible date that could apply to the \'time ago\' text. In the \'3 weeks ago\' \nexample, our date would be 1 second before 4 weeks prior to the current date (the date of the app running) because Pinterest always rounds down when between dates \n(i.e. if actual date was 3.8 weeks ago, it\'d say 3 weeks ago rather than 4 weeks ago). As the accuracy of the date may be important, a \'created_at_source\' property on the pin object to \nshow whether the source was rss or html.\n\nNote that having to scrape for many pins may take some time, so if you don\'t care about having the date returned with each pin object, you can turn dates off:\n\n```javascript\npinterest.setObtainDates(false);\n```\n\nYou can see the current state of obtainDates with:\n\n```javascript\npinterest.getObtainDates();\n```',
+18 silly publish   readmeFilename: 'README.md',
+18 silly publish   gitHead: '48647b7cb5aff6064dcb0e2a7c23572a1071c78a',
+18 silly publish   homepage: 'https://github.com/InsideInc/node-pinterest-api',
+18 silly publish   _id: 'pinterest-api@1.1.3',
+18 silly publish   _shasum: '17d3e281fd31ccf7dd7ac2c8c70ec8eb3eb5b44a',
+18 silly publish   _from: '.' }
+19 silly mapToRegistry name pinterest-api
+20 silly mapToRegistry using default registry
+21 silly mapToRegistry registry https://registry.npmjs.org/
+22 silly mapToRegistry uri https://registry.npmjs.org/pinterest-api
+23 verbose publish registryBase https://registry.npmjs.org/
+24 silly publish uploading /Users/andy/.npm/pinterest-api/1.1.3/package.tgz
+25 verbose request uri https://registry.npmjs.org/pinterest-api
+26 verbose request sending authorization for write operation
+27 info attempt registry request try #1 at 1:19:19 PM
+28 verbose request using bearer token for auth
+29 verbose request id 565dde66d86f8bbc
+30 http request PUT https://registry.npmjs.org/pinterest-api
+31 http 403 https://registry.npmjs.org/pinterest-api
+32 verbose headers { 'content-type': 'application/json',
+32 verbose headers   'cache-control': 'max-age=60',
+32 verbose headers   'content-length': '95',
+32 verbose headers   'accept-ranges': 'bytes',
+32 verbose headers   date: 'Wed, 21 Oct 2015 20:19:20 GMT',
+32 verbose headers   via: '1.1 varnish',
+32 verbose headers   connection: 'keep-alive',
+32 verbose headers   'x-served-by': 'cache-lax1434-LAX',
+32 verbose headers   'x-cache': 'MISS',
+32 verbose headers   'x-cache-hits': '0',
+32 verbose headers   'x-timer': 'S1445458759.928006,VS0,VE239' }
+33 verbose request invalidating /Users/andy/.npm/registry.npmjs.org/pinterest-api on PUT
+34 error publish Failed PUT 403
+35 verbose stack Error: "You cannot publish over the previously published version 1.1.3." : pinterest-api
+35 verbose stack     at CachingRegistryClient.<anonymous> (/usr/local/lib/node_modules/npm/node_modules/npm-registry-client/lib/request.js:247:14)
+35 verbose stack     at Request._callback (/usr/local/lib/node_modules/npm/node_modules/npm-registry-client/lib/request.js:170:14)
+35 verbose stack     at Request.self.callback (/usr/local/lib/node_modules/npm/node_modules/request/request.js:344:22)
+35 verbose stack     at Request.emit (events.js:110:17)
+35 verbose stack     at Request.<anonymous> (/usr/local/lib/node_modules/npm/node_modules/request/request.js:1239:14)
+35 verbose stack     at Request.emit (events.js:129:20)
+35 verbose stack     at IncomingMessage.<anonymous> (/usr/local/lib/node_modules/npm/node_modules/request/request.js:1187:12)
+35 verbose stack     at IncomingMessage.emit (events.js:129:20)
+35 verbose stack     at _stream_readable.js:908:16
+35 verbose stack     at process._tickCallback (node.js:355:11)
+36 verbose statusCode 403
+37 verbose pkgid pinterest-api
+38 verbose cwd /Users/andy/node-pinterest-api
+39 error Darwin 13.4.0
+40 error argv "/usr/local/bin/node" "/usr/local/bin/npm" "publish"
+41 error node v0.12.2
+42 error npm  v2.7.4
+43 error code E403
+44 error "You cannot publish over the previously published version 1.1.3." : pinterest-api
+45 error If you need help, you may report this error at:
+45 error     <https://github.com/npm/npm/issues>
+46 verbose exit [ 1, true ]
